@@ -1,6 +1,6 @@
 -- Modules/Quest.lua
 -- Stub for the quest panels: greeting, detail, progress, complete.
--- Text only, plus one primary button for the simple cases so a suppressed
+-- Text, clickable greeting rows, plus one primary button (Space presses it) for the simple cases so a suppressed
 -- quest flow can be exercised end to end. Anything the stub can't do yet
 -- (reward choice, PvP confirm, expensive turn-in) says so: close the panel
 -- and talk again holding the bypass modifier.
@@ -17,7 +17,7 @@ Quest.events = { "QUEST_GREETING", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMP
 local ACCENT = "|cffc9a45c%s|r"
 local GOOD, WARN = "|cff4fbf6b%s|r", "|cffe0b040%s|r"
 
-local parts, lines = {}, {}
+local parts, rows = {}, {}
 
 -- Joins non-empty paragraphs with a blank line between them.
 local function Paragraphs(...)
@@ -29,13 +29,14 @@ local function Paragraphs(...)
     return table.concat(parts, "\n\n")
 end
 
-function Quest:Show(title, body, primary)
+function Quest:Show(title, body, primary, listRows)
     Chui.Host:Present(self, {
         width = Chui.Theme.tokens.width.quest,
         title = title,
         subtitle = UnitName("npc"),
         body = body,
         primary = primary,
+        rows = listRows,
     })
 end
 
@@ -55,19 +56,25 @@ function Quest:QUEST_GREETING()
     if not Chui.Suppressor:ShouldRender("quest") then return end
     local t0 = debugprofilestop()
 
-    wipe(lines)
-    local n = 0
+    wipe(rows)
+    local icons = Chui.Theme.tokens.icons
     for i = 1, GetNumAvailableQuests() do
-        n = n + 1
-        lines[n] = ("%d.  |cffffd100!|r  %s"):format(n, GetAvailableTitle(i))
+        rows[#rows + 1] = {
+            text = GetAvailableTitle(i),
+            atlas = icons.offer.atlas, icon = icons.offer.file,
+            onClick = function() SelectAvailableQuest(i) end,
+        }
     end
     for i = 1, GetNumActiveQuests() do
         local title, isComplete = GetActiveTitle(i)
-        n = n + 1
-        lines[n] = ("%d.  %s?|r  %s"):format(n, isComplete and "|cffffd100" or "|cff808080", title)
+        rows[#rows + 1] = {
+            text = title,
+            atlas = icons.turnin.atlas, icon = icons.turnin.file, muted = not isComplete,
+            onClick = function() SelectActiveQuest(i) end,
+        }
     end
 
-    self:Show(UnitName("npc"), Paragraphs(GetGreetingText(), table.concat(lines, "\n")))
+    self:Show(UnitName("npc"), GetGreetingText(), nil, rows)
     Chui:Debug(("quest greeting render %.2f ms"):format(debugprofilestop() - t0))
 end
 

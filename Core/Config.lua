@@ -21,12 +21,12 @@ local defaults = {
         Quest = true,
         Merchant = true,
     },
-    -- Spike: suppression is opt-in per kind. Off = shadow mode (Chui's panel
-    -- appears beside Blizzard's). Becomes default-on once M1 panels are usable.
+    -- On = Chui owns the interaction and Blizzard's window is hidden. Off =
+    -- shadow mode (Chui's panel appears beside Blizzard's).
     suppress = {
-        gossip = false,
-        quest = false,
-        merchant = false,
+        gossip = true,
+        quest = true,
+        merchant = true,
     },
     layout = {
         offsetX = 400.0,
@@ -52,7 +52,7 @@ function Config:Init()
     Chui.db = ChuiDB
 end
 
--- Back to shipped defaults (debug off, every kind in shadow mode, all modules
+-- Back to shipped defaults (debug off, every kind suppressed, all modules
 -- on), keeping the trace log. Used to undo a spike/test session.
 function Config:Reset()
     local db = Chui.db
@@ -110,6 +110,27 @@ Chui:RegisterCommand("suppress", "<gossip|quest|merchant> [on|off] - hide Blizza
         Chui.Suppressor:IsEngaged(kind) == on and "" or " (applies when no NPC window is open)"))
 end)
 
+Chui:RegisterCommand("suppress-all", "[on|off] - hide Blizzard's window for every kind (no argument: toggle)", function(arg)
+    local value = arg:lower()
+    local on
+    if value == "on" then on = true
+    elseif value == "off" then on = false
+    elseif value == "" then
+        on = false
+        for kind in pairs(Chui.db.suppress) do
+            if not Chui.db.suppress[kind] then on = true end
+        end
+    else
+        Chui:Print("usage: /chui suppress-all [on|off]")
+        return
+    end
+    for kind in pairs(Chui.db.suppress) do
+        Chui.db.suppress[kind] = on
+    end
+    Chui.Suppressor:Sync()
+    Chui:Print("suppress all:", on and "on" or "off", "(applies to each kind when no NPC window is open)")
+end)
+
 Chui:RegisterCommand("bypass", "<shift|ctrl|alt|none> - modifier that shows the default window", function(arg)
     local key = arg:upper()
     if key ~= "SHIFT" and key ~= "CTRL" and key ~= "ALT" and key ~= "NONE" then
@@ -120,7 +141,7 @@ Chui:RegisterCommand("bypass", "<shift|ctrl|alt|none> - modifier that shows the 
     Chui:Print("bypass modifier:", key)
 end)
 
-Chui:RegisterCommand("reset", "restore default settings (shadow mode, debug off)", function()
+Chui:RegisterCommand("reset", "restore default settings (all suppressed, debug off)", function()
     Chui.Config:Reset()
     Chui:Print("settings reset to defaults")
 end)

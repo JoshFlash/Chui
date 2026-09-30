@@ -1,6 +1,6 @@
 std = "lua51"
 max_line_length = false
-exclude_files = { "Libs/", "Tests/" }
+exclude_files = { "Libs/", "LocalDev/" }
 
 -- Chui's own globals.
 globals = { "ChuiDB", "SLASH_CHUI1", "SlashCmdList", "UISpecialFrames" }
@@ -14,7 +14,7 @@ read_globals = {
     "CustomGossipFrameManager", "GossipFrame", "QuestFrame", "MerchantFrame",
     "ClassTrainerFrame", "debugprofilestop", "geterrorhandler", "issecretvalue",
     "wipe", "tinsert", "date", "GetTime", "GetMoney", "GetMoneyString",
-    "InCombatLockdown", "IsShiftKeyDown", "IsControlKeyDown", "IsAltKeyDown",
+    "InCombatLockdown", "C_Texture", "IsKeyDown", "IsShiftKeyDown", "IsControlKeyDown", "IsAltKeyDown",
     "SetPlayerInteractionConditions", "UnitName", "GetMinimapZoneText",
     "CloseMerchant", "GetMerchantNumItems", "AcceptQuest", "AcknowledgeAutoAcceptQuest",
     "CloseQuest", "CompleteQuest", "DeclineQuest", "GetQuestReward", "GetTitleText",

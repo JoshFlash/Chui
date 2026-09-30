@@ -5,6 +5,8 @@
 local _, Chui = ...
 
 local FUNCTIONS = {
+    -- Input
+    "IsKeyDown", "C_Texture.GetAtlasInfo",
     -- Gossip
     "C_GossipInfo.GetText", "C_GossipInfo.GetOptions", "C_GossipInfo.GetAvailableQuests",
     "C_GossipInfo.GetActiveQuests", "C_GossipInfo.SelectOption", "C_GossipInfo.SelectOptionByIndex",

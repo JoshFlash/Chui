@@ -24,6 +24,22 @@ Theme.tokens = {
         tight   = 4,  -- title to subtitle
         section = 12, -- between regions
         pad     = 16, -- panel inner padding
+        row     = 34, -- height of a clickable row
+        icon    = 24, -- row icon size
+    },
+    -- Blizzard font objects, so locale glyph coverage stays correct.
+    font = {
+        title    = "GameFontNormalHuge",
+        subtitle = "GameFontHighlight",
+        body     = "GameFontHighlightLarge",
+        row      = "GameFontHighlightLarge",
+    },
+    -- Row icons. An atlas is preferred; the file is used when the atlas is
+    -- missing on a client. Gossip options bring their own icon file ID.
+    icons = {
+        offer  = { atlas = "QuestNormal", file = "Interface\GossipFrame\AvailableQuestIcon" },
+        turnin = { atlas = "QuestTurnin", file = "Interface\GossipFrame\ActiveQuestIcon" },
+        option = { file = "Interface\GossipFrame\GossipGossipIcon" },
     },
     width = {
         default = 480,

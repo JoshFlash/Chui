@@ -43,3 +43,6 @@ luac.out
 .vscode/settings.json
 LocalDev/mock.lua
 LocalDev/suppressor_test.lua
+
+# Local playground: scratch tests and experiments, not part of the repo
+LocalDev/

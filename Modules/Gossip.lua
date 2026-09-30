@@ -4,14 +4,14 @@
 --   suppressed        /chui suppress gossip on. GossipFrame never shows; Chui
 --                     replicates the bits of Blizzard's show logic that are
 --                     not just drawing (auto-select, custom gossip frames).
--- Clickable rows, confirm and code entry arrive in M1.
+-- Rows are clickable. Confirm, code entry and number keys arrive later in M1.
 local _, Chui = ...
 
 local Gossip = Chui:NewModule("Gossip")
 Gossip.kind = "gossip"
 Gossip.events = { "GOSSIP_SHOW", "GOSSIP_CLOSED" }
 
-local GOLD, GREY = "|cffffd100", "|cff808080"
+local GREY = "|cff808080"
 
 ---------------------------------------------------------------------------
 -- State: API reads -> plain table (Section 3, "State in, pixels out")
@@ -46,36 +46,42 @@ end
 -- View: state -> Host content. Pure function of the state table, so the
 -- /chui test fixture renders exactly like a real NPC.
 ---------------------------------------------------------------------------
-local buf = {}
+local rows = {}
 
+-- `owner` is only passed by the fixture, whose rows must not call the game.
 function Gossip:Render(s, owner)
-    wipe(buf)
-    if s.text ~= "" then
-        buf[#buf + 1] = s.text
-        buf[#buf + 1] = ""
-    end
+    wipe(rows)
+    local live = owner == nil
 
-    local n = 0
+    local icons = Chui.Theme.tokens.icons
     for _, q in ipairs(s.available) do
-        n = n + 1
-        local color = q.isTrivial and GREY or ""
-        buf[#buf + 1] = ("%d.  %s!|r  %s%s|r"):format(n, GOLD, color, q.title)
+        rows[#rows + 1] = {
+            text = q.isTrivial and (GREY .. q.title .. "|r") or q.title,
+            atlas = icons.offer.atlas, icon = icons.offer.file, muted = q.isTrivial,
+            onClick = live and function() C_GossipInfo.SelectAvailableQuest(q.questID) end,
+        }
     end
     for _, q in ipairs(s.active) do
-        n = n + 1
-        local icon = q.isComplete and GOLD or GREY
-        buf[#buf + 1] = ("%d.  %s?|r  %s"):format(n, icon, q.title)
+        rows[#rows + 1] = {
+            text = q.title,
+            atlas = icons.turnin.atlas, icon = icons.turnin.file, muted = not q.isComplete,
+            onClick = live and function() C_GossipInfo.SelectActiveQuest(q.questID) end,
+        }
     end
     for _, o in ipairs(s.options) do
-        n = n + 1
-        buf[#buf + 1] = ("%d.  %s"):format(n, o.name)
+        rows[#rows + 1] = {
+            text = o.name,
+            icon = o.icon or icons.option.file,
+            onClick = live and function() C_GossipInfo.SelectOptionByIndex(o.orderIndex) end,
+        }
     end
 
     Chui.Host:Present(owner or self, {
         width = Chui.Theme.tokens.width.gossip,
         title = s.title,
         subtitle = s.subtitle,
-        body = table.concat(buf, "\n"),
+        body = s.text,
+        rows = rows,
     })
 end
 
