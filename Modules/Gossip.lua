@@ -57,6 +57,7 @@ function Gossip:Render(s, owner)
     for _, q in ipairs(s.available) do
         rows[#rows + 1] = {
             text = q.isTrivial and Paint("dim", q.title) or q.title,
+            wrap = true,
             atlas = icons.offer.atlas, icon = icons.offer.file, muted = q.isTrivial,
             onClick = live and function() C_GossipInfo.SelectAvailableQuest(q.questID) end,
         }
@@ -64,6 +65,7 @@ function Gossip:Render(s, owner)
     for _, q in ipairs(s.active) do
         rows[#rows + 1] = {
             text = q.title,
+            wrap = true,
             atlas = icons.turnin.atlas, icon = icons.turnin.file, muted = not q.isComplete,
             onClick = live and function() C_GossipInfo.SelectActiveQuest(q.questID) end,
         }
@@ -71,6 +73,7 @@ function Gossip:Render(s, owner)
     for _, o in ipairs(s.options) do
         rows[#rows + 1] = {
             text = o.name,
+            wrap = true,
             icon = o.icon or icons.option.file,
             onClick = live and function() C_GossipInfo.SelectOptionByIndex(o.orderIndex) end,
         }
@@ -82,6 +85,7 @@ function Gossip:Render(s, owner)
         subtitle = s.subtitle,
         body = s.text,
         rows = rows,
+        fixedHeight = true,
     })
 end
 
@@ -150,6 +154,8 @@ local FIXTURE = {
     },
     options = {
         { name = "Make this inn your home." },
+        { name = "I have been travelling for many weeks and my pack is heavy, so I would like to know whether "
+            .. "you keep a private room, a hot bath, and a stable for my mount, and what all of it would cost." },
         { name = "Let me browse your goods." },
         { name = "I'd like to rent a room." },
         { name = "I need to send a letter." },

@@ -6,7 +6,9 @@ local _, Chui = ...
 
 local FUNCTIONS = {
     -- Input
-    "IsKeyDown", "C_Texture.GetAtlasInfo",
+    "IsKeyDown", "C_Texture.GetAtlasInfo", "IsModifiedClick", "PickupMerchantItem", "OpenStackSplitFrame",
+    "C_Item.GetItemQualityByID", "StackSplitFrame.OpenStackSplitFrame", "C_Container.ShowContainerSellCursor", "SetCursor", "ResetCursor",
+    "ShowInspectCursor", "hooksecurefunc",
     -- Gossip
     "C_GossipInfo.GetText", "C_GossipInfo.GetOptions", "C_GossipInfo.GetAvailableQuests",
     "C_GossipInfo.GetActiveQuests", "C_GossipInfo.SelectOption", "C_GossipInfo.SelectOptionByIndex",

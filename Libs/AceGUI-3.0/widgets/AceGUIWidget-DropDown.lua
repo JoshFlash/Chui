@@ -54,8 +54,8 @@ do
 		insets = { left = 3, right = 3, top = 3, bottom = 3 }
 	}
 
-	local defaultWidth = 200
-	local defaultMaxHeight = 600
+	local defaultWidth = 180
+	local defaultMaxHeight = 400
 
 	--[[ UI Event Handlers ]]--
 

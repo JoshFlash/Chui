@@ -14,7 +14,7 @@ read_globals = {
     "CustomGossipFrameManager", "GossipFrame", "QuestFrame", "MerchantFrame",
     "ClassTrainerFrame", "debugprofilestop", "geterrorhandler", "issecretvalue",
     "wipe", "tinsert", "date", "GetTime", "GetMoney", "GetMoneyString",
-    "InCombatLockdown", "CreateFont", "GetLocale", "Settings", "LibStub", "C_Texture", "IsKeyDown", "IsShiftKeyDown", "IsControlKeyDown", "IsAltKeyDown",
+    "InCombatLockdown", "BuybackItem", "GetNumBuybackItems", "GetBuybackItemInfo", "GetBuybackItemLink", "StackSplitFrame", "SetCursor", "ResetCursor", "ShowInspectCursor", "hooksecurefunc", "C_Container", "StaticPopupDialogs", "StaticPopup_Show", "GameTooltip", "HandleModifiedItemClick", "IsModifiedClick", "OpenStackSplitFrame", "PickupMerchantItem", "BuyMerchantItem", "GetMerchantItemLink", "GetMerchantItemCostInfo", "GetMerchantItemCostItem", "GetMerchantItemMaxStack", "ITEM_QUALITY_COLORS", "CANCEL", "CreateFont", "GetLocale", "Settings", "LibStub", "C_Texture", "IsKeyDown", "IsShiftKeyDown", "IsControlKeyDown", "IsAltKeyDown",
     "SetPlayerInteractionConditions", "UnitName", "GetMinimapZoneText",
     "CloseMerchant", "GetMerchantNumItems", "AcceptQuest", "AcknowledgeAutoAcceptQuest",
     "CloseQuest", "CompleteQuest", "DeclineQuest", "GetQuestReward", "GetTitleText",

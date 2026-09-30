@@ -43,6 +43,8 @@ Theme.tokens = {
         pad     = 16, -- panel inner padding
         row     = 34, -- height of a clickable row
         icon    = 24, -- row icon size
+        tab     = 24, -- height of a header tab button
+        edge    = 2,  -- panel border thickness, in physical pixels
         safe    = 24, -- minimum gap between the panel and the screen edge
         scrollbar = 3, -- scroll indicator width
     },

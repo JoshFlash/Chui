@@ -41,9 +41,23 @@ end
 
 -- Fit header + content + footer into maxHeight. Content that doesn't fit
 -- scrolls inside a viewport; header and footer never scroll.
---   m = { header, content, footer, maxHeight, minViewport (optional) }
+--   m = { header, content, footer, maxHeight, minViewport (optional),
+--         fixedHeight (optional) }
 --   -> { height, viewport, scroll, maxScroll }
+-- With fixedHeight the panel is always maxHeight tall, however little content
+-- there is, so it doesn't change size between views; the body scrolls only
+-- when the content is taller than its viewport.
 function Layout.Fit(m)
+    if m.fixedHeight then
+        local viewport = math.max(m.minViewport or 0, m.maxHeight - m.header - m.footer)
+        local maxScroll = math.max(0, m.content - viewport)
+        return {
+            height = m.header + viewport + m.footer,
+            viewport = viewport,
+            scroll = maxScroll > 0,
+            maxScroll = maxScroll,
+        }
+    end
     local natural = m.header + m.content + m.footer
     if natural <= m.maxHeight then
         return { height = natural, viewport = m.content, scroll = false, maxScroll = 0 }

@@ -36,6 +36,7 @@ function Quest:Show(title, body, primary, listRows, owner)
         body = body,
         primary = primary,
         rows = listRows,
+        fixedHeight = true,
     })
 end
 
@@ -60,6 +61,7 @@ function Quest:QUEST_GREETING()
     for i = 1, GetNumAvailableQuests() do
         rows[#rows + 1] = {
             text = GetAvailableTitle(i),
+            wrap = true,
             atlas = icons.offer.atlas, icon = icons.offer.file,
             onClick = function() SelectAvailableQuest(i) end,
         }
@@ -68,6 +70,7 @@ function Quest:QUEST_GREETING()
         local title, isComplete = GetActiveTitle(i)
         rows[#rows + 1] = {
             text = title,
+            wrap = true,
             atlas = icons.turnin.atlas, icon = icons.turnin.file, muted = not isComplete,
             onClick = function() SelectActiveQuest(i) end,
         }

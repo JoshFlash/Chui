@@ -37,9 +37,9 @@ local defaults = {
             scale = 1.0,      -- 0.85 to 1.4
         },
         layout = {
-            offsetXPct = 0.23,   -- nudge right 23% of screen width
-            offsetYPct = 0.08,   -- nudge up 8% of screen height
-            maxHeightPct = 0.64, -- panel height cap; taller content scrolls
+            offsetXPct = 0.16,   -- nudge right comfortably
+            offsetYPct = 0.04,   -- nudge up a tiny bit
+            maxHeightPct = 0.48, -- panel height cap; taller content scrolls
         },
     },
     global = {
