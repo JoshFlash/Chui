@@ -1,0 +1,18 @@
+## Interface: 120100, 120105
+## Title: Chui
+## Notes: Instant, centered replacement panels for NPC interactions.
+## Author: Tattva
+## Version: @project-version@
+## SavedVariables: ChuiDB
+## IconTexture: Interface\Icons\INV_Misc_Book_09
+
+# Load order matters: each file can only use what earlier files defined
+# at load time. Event handlers run later, after every file has loaded.
+
+Core\Init.lua
+Core\EventBus.lua
+Core\Theme.lua
+Core\Config.lua
+Core\Host.lua
+
+Modules\Gossip.lua
