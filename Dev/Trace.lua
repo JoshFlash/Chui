@@ -38,7 +38,7 @@ end
 
 local function Log(text)
     local line = ("f=%.3f %+8.1fms  %s"):format(GetTime(), debugprofilestop() - startMs, text)
-    local log = Chui.db.trace
+    local log = Chui.adb.global.trace
     log[#log + 1] = line
     if #log > MAX_LINES then table.remove(log, 1) end
     print("|cff9aa3b5[trace]|r", line)
@@ -69,7 +69,7 @@ end
 
 Chui:RegisterCommand("trace", "[clear] - dev: toggle the NPC event trace", function(arg)
     if arg == "clear" then
-        wipe(Chui.db.trace)
+        wipe(Chui.adb.global.trace)
         Chui:Print("trace cleared")
         return
     end
@@ -78,7 +78,7 @@ Chui:RegisterCommand("trace", "[clear] - dev: toggle the NPC event trace", funct
         startMs = debugprofilestop()
         HookFrames() -- ClassTrainerFrame only exists after a trainer loads it
         for _, event in ipairs(EVENTS) do listener:RegisterEvent(event) end
-        Chui.db.trace[#Chui.db.trace + 1] = ("--- trace started %s ---"):format(date("%Y-%m-%d %H:%M:%S"))
+        Chui.adb.global.trace[#Chui.adb.global.trace + 1] = ("--- trace started %s ---"):format(date("%Y-%m-%d %H:%M:%S"))
     else
         listener:UnregisterAllEvents()
     end

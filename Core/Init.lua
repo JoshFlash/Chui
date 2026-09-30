@@ -14,6 +14,7 @@ Chui.name = ADDON_NAME
 Chui.modules = {}     -- name -> module table
 Chui.moduleOrder = {} -- registration order, so enabling is deterministic
 Chui.commands = {}    -- "/chui <name>" -> { fn = function(arg), help = "..." }
+Chui.cfg = {}         -- flat settings cache, filled by Core/Config.lua
 
 do
     local v = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version")
@@ -31,7 +32,7 @@ function Chui:Print(...)
 end
 
 function Chui:Debug(...)
-    if self.db and self.db.debug then
+    if self.cfg.debug then
         print(PREFIX, "|cff9aa3b5[debug]|r", ...)
     end
 end

@@ -166,7 +166,7 @@ local MODIFIER_TESTS = {
 }
 
 function Suppressor:BypassHeld()
-    local test = MODIFIER_TESTS[Chui.db.bypassKey]
+    local test = MODIFIER_TESTS[Chui.cfg.bypassKey]
     return test ~= nil and test()
 end
 
@@ -296,7 +296,7 @@ end
 ---------------------------------------------------------------------------
 function Suppressor:PrintStatus()
     Chui:Print(("bypass key %s (%s), idle %s, combat %s"):format(
-        Chui.db.bypassKey, self:BypassHeld() and "held" or "up",
+        Chui.cfg.bypassKey, self:BypassHeld() and "held" or "up",
         tostring(IsIdle()), tostring(InCombatLockdown())))
     for kind, spec in pairs(SPECS) do
         print(("  %-9s %-11s wanted=%s engaged=%s%s%s"):format(

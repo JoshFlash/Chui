@@ -250,12 +250,12 @@ end
 
 -- Section 7.1, "Center" anchor mode.
 function Host:Place(width, height)
-    local f, layout = self.frame, Chui.db.layout
+    local f, cfg = self.frame, Chui.cfg
     local screenH = UIParent:GetHeight()
     PixelUtil.SetSize(f, width, height)
     f:ClearAllPoints()
     PixelUtil.SetPoint(f, "CENTER", UIParent, "CENTER",
-        layout.offsetX, math.floor(screenH * layout.offsetYPct))
+        cfg.offsetX, math.floor(screenH * cfg.offsetYPct))
 end
 
 -- Closing is two-way (Section 5.4):
