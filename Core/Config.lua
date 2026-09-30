@@ -136,6 +136,15 @@ function Config:Reset()
     Chui.adb:ResetProfile()
 end
 
+-- Put the panel back where a fresh install has it, after it's been dragged.
+function Config:ResetPosition()
+    local layout, default = Chui.db.layout, defaults.profile.layout
+    layout.offsetXPct = default.offsetXPct
+    layout.offsetYPct = default.offsetYPct
+    self:Rebuild()
+    Chui.Host:Refresh()
+end
+
 ---------------------------------------------------------------------------
 -- Slash commands. Subcommands live in Chui.commands so any file (Dev/
 -- tools included) can add its own with Chui:RegisterCommand.
@@ -222,6 +231,11 @@ Chui:RegisterCommand("bypass", "<shift/ctrl/alt/none> - modifier that shows the 
     Chui.db.bypassKey = key
     Chui.Config:Rebuild()
     Chui:Print("bypass modifier:", key)
+end)
+
+Chui:RegisterCommand("resetpos", "put the panel back in its default position", function()
+    Chui.Config:ResetPosition()
+    Chui:Print("panel position reset")
 end)
 
 Chui:RegisterCommand("reset", "restore default settings (all suppressed, debug off)", function()

@@ -55,6 +55,17 @@ function Host:Init()
     f:EnableMouse(true)      -- clicks on the panel don't fall through to the world
     f:Hide()
 
+    -- Drag the panel by its background or header. Buttons and rows handle
+    -- their own clicks, so they don't start a drag. The new position is saved
+    -- in the profile and used for every panel from then on.
+    f:SetMovable(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", function(self) self:StartMoving() end)
+    f:SetScript("OnDragStop", function(self)
+        self:StopMovingOrSizing()
+        Host:SavePosition()
+    end)
+
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetColorTexture(unpack(T.surface.base))
@@ -315,8 +326,22 @@ function Host:UpdateThumb(scrollPos)
     thumb:Show()
 end
 
--- Section 7.1: always centred (with the configured nudge), kept inside the
--- safe margins. A draggable window is planned to replace this.
+-- Where the panel's centre ended up after a drag, as shares of the screen
+-- (the same offsetXPct / offsetYPct the default placement uses), saved in the
+-- profile. Then re-anchored through Place, which also applies the safe margin.
+function Host:SavePosition()
+    local f = self.frame
+    local cx, cy = f:GetCenter()
+    local ux, uy = UIParent:GetCenter()
+    local layout = Chui.db.layout
+    layout.offsetXPct = (cx - ux) / UIParent:GetWidth()
+    layout.offsetYPct = (cy - uy) / UIParent:GetHeight()
+    Chui.Config:Rebuild()
+    self:Place(f:GetWidth(), f:GetHeight())
+end
+
+-- Section 7.1: centred on the saved position (default: nudged right and up),
+-- kept inside the safe margins. Dragging the panel changes the position.
 function Host:Place(width, height)
     local f, cfg = self.frame, Chui.cfg
     local x, y = Layout.Place(UIParent:GetWidth(), UIParent:GetHeight(), width, height, {

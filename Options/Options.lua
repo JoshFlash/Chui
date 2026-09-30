@@ -71,6 +71,13 @@ local function Build()
                             ApplyFont()
                         end,
                     },
+                    resetPosition = {
+                        type = "execute",
+                        name = "Reset panel position",
+                        desc = "Drag a panel to move it; it stays where you put it. This puts it back in the default spot.",
+                        order = 4,
+                        func = function() Chui.Config:ResetPosition() end,
+                    },
                     preview = {
                         type = "execute",
                         name = "Show a sample panel",
