@@ -16,7 +16,10 @@ Core\Init.lua
 Core\EventBus.lua
 Core\Theme.lua
 Core\Layout.lua
+Media\Fonts.lua
+Core\Fonts.lua
 Core\Config.lua
+Options\Options.lua
 Core\Host.lua
 Core\Suppressor.lua
 
@@ -28,4 +31,5 @@ Modules\Merchant.lua
 #@debug@
 Dev\Trace.lua
 Dev\ApiCheck.lua
+Dev\FontInfo.lua
 #@end-debug@

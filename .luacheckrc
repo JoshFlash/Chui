@@ -14,7 +14,7 @@ read_globals = {
     "CustomGossipFrameManager", "GossipFrame", "QuestFrame", "MerchantFrame",
     "ClassTrainerFrame", "debugprofilestop", "geterrorhandler", "issecretvalue",
     "wipe", "tinsert", "date", "GetTime", "GetMoney", "GetMoneyString",
-    "InCombatLockdown", "LibStub", "C_Texture", "IsKeyDown", "IsShiftKeyDown", "IsControlKeyDown", "IsAltKeyDown",
+    "InCombatLockdown", "CreateFont", "GetLocale", "Settings", "LibStub", "C_Texture", "IsKeyDown", "IsShiftKeyDown", "IsControlKeyDown", "IsAltKeyDown",
     "SetPlayerInteractionConditions", "UnitName", "GetMinimapZoneText",
     "CloseMerchant", "GetMerchantNumItems", "AcceptQuest", "AcknowledgeAutoAcceptQuest",
     "CloseQuest", "CompleteQuest", "DeclineQuest", "GetQuestReward", "GetTitleText",

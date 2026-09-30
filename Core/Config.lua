@@ -32,6 +32,10 @@ local defaults = {
             quest = true,
             merchant = true,
         },
+        font = {
+            face = "classicabook", -- a key from Fonts:List(); "default" is the game font
+            scale = 1.0,      -- 0.85 to 1.4
+        },
         layout = {
             offsetXPct = 0.23,   -- nudge right 23% of screen width
             offsetYPct = 0.08,   -- nudge up 8% of screen height
@@ -107,6 +111,8 @@ end
 -- suppression in line with the new profile's settings.
 function Config:OnProfileChanged()
     Bind()
+    Chui.Fonts:Apply()
+    Chui.Host:Refresh()
     for _, name in ipairs(Chui.moduleOrder) do
         if Chui.db.modules[name] ~= false then Chui:EnableModule(name) else Chui:DisableModule(name) end
     end
@@ -118,6 +124,7 @@ function Config:Init()
     Chui.adb = adb
     Migrate(adb)
     Bind()
+    Chui.Fonts:Apply() -- before Host:Init builds the panel's text
     adb.RegisterCallback(self, "OnProfileChanged", "OnProfileChanged")
     adb.RegisterCallback(self, "OnProfileCopied", "OnProfileChanged")
     adb.RegisterCallback(self, "OnProfileReset", "OnProfileChanged")

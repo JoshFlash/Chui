@@ -61,11 +61,11 @@ function Host:Init()
     AddPixelBorder(f, unpack(T.edge.accent))
 
     -- Font objects derived from Blizzard's keep locale glyph coverage correct.
-    self.title = f:CreateFontString(nil, "OVERLAY", T.font.title)
+    self.title = f:CreateFontString(nil, "OVERLAY", Chui.Fonts.name.title)
     self.title:SetJustifyH("LEFT")
     self.title:SetTextColor(unpack(T.text.primary))
 
-    self.subtitle = f:CreateFontString(nil, "OVERLAY", T.font.subtitle)
+    self.subtitle = f:CreateFontString(nil, "OVERLAY", Chui.Fonts.name.subtitle)
     self.subtitle:SetJustifyH("LEFT")
     self.subtitle:SetTextColor(unpack(T.text.secondary))
 
@@ -84,7 +84,7 @@ function Host:Init()
     thumb:Hide()
     self.thumb = thumb
 
-    self.body = child:CreateFontString(nil, "OVERLAY", T.font.body)
+    self.body = child:CreateFontString(nil, "OVERLAY", Chui.Fonts.name.body)
     self.body:SetJustifyH("LEFT")
     self.body:SetJustifyV("TOP")
     self.body:SetSpacing(2)
@@ -162,7 +162,7 @@ function Host:AcquireRow(i)
         icon:SetSize(T.space.icon, T.space.icon)
         icon:SetPoint("LEFT", 8, 0)
         row.icon = icon
-        local text = row:CreateFontString(nil, "OVERLAY", T.font.row)
+        local text = row:CreateFontString(nil, "OVERLAY", Chui.Fonts.name.row)
         text:SetPoint("RIGHT", -8, 0)
         text:SetJustifyH("LEFT")
         text:SetWordWrap(false)
@@ -327,7 +327,22 @@ function Host:Place(width, height)
     PixelUtil.SetPoint(f, "CENTER", UIParent, "CENTER", x, y)
 end
 
--- Lay the open panel out again (screen size or UI scale changed).
+-- Give every piece of Chui text the current face and size of its font
+-- object. Text made from a font template can keep the face it was created
+-- with, so after a font setting changes this is set on each one explicitly.
+function Host:ApplyFonts()
+    if not self.frame then return end
+    local names = Chui.Fonts.name
+    local function sync(fontString, role)
+        fontString:SetFont(_G[names[role]]:GetFont())
+    end
+    sync(self.title, "title")
+    sync(self.subtitle, "subtitle")
+    sync(self.body, "body")
+    for _, row in ipairs(self.rowPool) do sync(row.text, "row") end
+end
+
+-- Lay the open panel out again (screen size, UI scale or font changed).
 function Host:Refresh()
     if self.frame and self.frame:IsShown() and self.owner and self.lastContent then
         self:Present(self.owner, self.lastContent)
