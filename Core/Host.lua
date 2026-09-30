@@ -2,8 +2,8 @@
 -- The single shared, centered panel every interaction renders into
 -- (Sections 5.1 and 7).
 --
--- Scaffold version: fixed anatomy (title, subtitle, body text, close button)
--- laid out by hand. In M1 this becomes a generic container for module views
+-- Scaffold version: fixed anatomy (title, subtitle, body text, one primary
+-- button, close button) laid out by hand. In M1 this becomes a generic container for module views
 -- with header / scrollable body / footer, max-height clamping and pooled
 -- widgets. The public shape (Present, Dismiss, OnHostClosed) stays the same.
 local _, Chui = ...
@@ -72,6 +72,18 @@ function Host:Init()
     self.body:SetSpacing(2)
     self.body:SetTextColor(unpack(T.text.primary))
 
+    -- Primary action, always bottom-right (Section 10.1). No click-through
+    -- guard yet (M1, Section 11.3): a double-click can hit the next view's
+    -- button, so click deliberately while testing.
+    local primary = CreateFrame("Button", nil, f, "UIPanelButtonTemplate")
+    primary:SetHeight(24)
+    primary:SetPoint("BOTTOMRIGHT", -T.space.pad, T.space.pad)
+    primary:SetScript("OnClick", function()
+        if Host.primaryAction then Host.primaryAction() end
+    end)
+    primary:Hide()
+    self.primary = primary
+
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -2, -2)
     close:SetScript("OnClick", function() f:Hide() end)
@@ -84,7 +96,8 @@ end
 
 -- Lay out content, size to fit, center, show. Synchronous: the panel is
 -- complete before this returns (Section 3, "Render on the event").
--- content = { title, subtitle, body, width }
+-- content = { title, subtitle, body, width,
+--             primary = { text, onClick, enabled } (optional) }
 function Host:Present(owner, content)
     local f = self.frame
     local pad = T.space.pad
@@ -118,7 +131,22 @@ function Host:Present(owner, content)
     body:SetText(content.body or "") -- text metrics are available immediately
     body:ClearAllPoints()
     body:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -y)
-    y = y + body:GetStringHeight() + pad
+    y = y + body:GetStringHeight()
+
+    local p, button = content.primary, self.primary
+    if p then
+        y = y + T.space.section
+        button:SetText(p.text)
+        button:SetWidth(math.max(96, button:GetTextWidth() + 32))
+        button:SetEnabled(p.enabled ~= false)
+        self.primaryAction = p.onClick
+        button:Show()
+        y = y + button:GetHeight()
+    else
+        self.primaryAction = nil
+        button:Hide()
+    end
+    y = y + pad
 
     -- TODO(M1): clamp to maxHeightPct and scroll the body beyond it.
     self.owner = owner

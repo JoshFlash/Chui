@@ -41,7 +41,8 @@ end
 
 -- Dispatch: module:EVENT_NAME(...) inside an error boundary. A failing
 -- handler disables only its own module (fail open); other modules and the
--- default UI keep working.
+-- default UI keep working. The event and its arguments are passed along so
+-- the failed event can be replayed to Blizzard's frame.
 frame:SetScript("OnEvent", function(_, event, ...)
     local set = listeners[event]
     if not set then return end
@@ -50,7 +51,7 @@ frame:SetScript("OnEvent", function(_, event, ...)
         if handler then
             local ok, err = pcall(handler, module, ...)
             if not ok then
-                Chui:OnModuleError(module, err)
+                Chui:OnModuleError(module, err, event, ...)
             end
         end
     end

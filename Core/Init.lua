@@ -13,6 +13,7 @@ _G.Chui = Chui -- lets you /dump Chui in game; later hosts the public API
 Chui.name = ADDON_NAME
 Chui.modules = {}     -- name -> module table
 Chui.moduleOrder = {} -- registration order, so enabling is deterministic
+Chui.commands = {}    -- "/chui <name>" -> { fn = function(arg), help = "..." }
 
 do
     local v = C_AddOns.GetAddOnMetadata(ADDON_NAME, "Version")
@@ -35,9 +36,15 @@ function Chui:Debug(...)
     end
 end
 
+-- Any file (including Dev/ files) can add a slash subcommand.
+function Chui:RegisterCommand(name, help, fn)
+    self.commands[name] = { help = help, fn = fn }
+end
+
 ---------------------------------------------------------------------------
 -- Modules
 -- A module is a plain table with:
+--   .kind        suppression kind it owns ("gossip", "quest", ...), optional
 --   .events      list of event names it needs while enabled
 --   :EVENT_NAME  a method per event (dispatched by Core.EventBus)
 --   :OnEnable / :OnDisable   optional
@@ -66,6 +73,7 @@ function Chui:EnableModule(name)
     for _, event in ipairs(module.events or {}) do
         self.EventBus:Register(module, event)
     end
+    if module.kind then self.Suppressor:SetModuleActive(module.kind, true) end
     if module.OnEnable then module:OnEnable() end
     self:Debug("enabled", name)
 end
@@ -76,15 +84,24 @@ function Chui:DisableModule(name)
     module.enabled = false
     self.EventBus:UnregisterAll(module)
     self.Host:Dismiss(module) -- hide our panel without ending the interaction
+    -- Hand the interaction type back to Blizzard immediately, even mid-interaction.
+    if module.kind then self.Suppressor:SetModuleActive(module.kind, false) end
     if module.OnDisable then module:OnDisable() end
     self:Debug("disabled", name)
 end
 
 -- Error boundary target (Section 3, "Fail open"). A module that throws is
--- switched off so the default Blizzard window takes over. The error is still
--- forwarded to the error handler so BugSack or the Lua error frame shows it.
-function Chui:OnModuleError(module, err)
+-- switched off, suppression for its kind is released, and the event that
+-- failed is replayed to Blizzard's frame so the default window appears now
+-- rather than on the next interaction. The error still reaches BugSack.
+function Chui:OnModuleError(module, err, event, ...)
+    -- Only replay if Blizzard really missed the event. In shadow mode (or a
+    -- bypassed interaction) its frame already received it.
+    local missed = module.kind and self.Suppressor:IsEngaged(module.kind)
     self:DisableModule(module.name)
+    if missed and event then
+        self.Suppressor:Replay(module.kind, event, ...)
+    end
     if not module.errorReported then
         module.errorReported = true
         self:Print(("The %s module hit an error and was switched off until /reload."):format(module.name))
@@ -108,6 +125,7 @@ boot:SetScript("OnEvent", function(self, event, arg1)
     elseif event == "PLAYER_LOGIN" then
         self:UnregisterEvent("PLAYER_LOGIN")
         Chui.Host:Init()
+        Chui.Suppressor:Init()
         for _, name in ipairs(Chui.moduleOrder) do
             if Chui.db.modules[name] ~= false then
                 Chui:EnableModule(name)

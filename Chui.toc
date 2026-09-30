@@ -6,6 +6,9 @@
 ## SavedVariables: ChuiDB
 ## IconTexture: Interface\Icons\INV_Misc_Book_09
 
+# Libraries (vendored in Libs/, see README)
+embeds.xml
+
 # Load order matters: each file can only use what earlier files defined
 # at load time. Event handlers run later, after every file has loaded.
 
@@ -14,5 +17,14 @@ Core\EventBus.lua
 Core\Theme.lua
 Core\Config.lua
 Core\Host.lua
+Core\Suppressor.lua
 
 Modules\Gossip.lua
+Modules\Quest.lua
+Modules\Merchant.lua
+
+# Development tools. The packager comments these lines out of release builds.
+#@debug@
+Dev\Trace.lua
+Dev\ApiCheck.lua
+#@end-debug@
