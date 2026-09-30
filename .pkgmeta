@@ -1,0 +1,7 @@
+package-as: Chui
+
+ignore:
+  - Tests
+  - README.md
+  - .luacheckrc
+  - .github
