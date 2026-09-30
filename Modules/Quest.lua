@@ -14,8 +14,7 @@ local Quest = Chui:NewModule("Quest")
 Quest.kind = "quest"
 Quest.events = { "QUEST_GREETING", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE", "QUEST_FINISHED" }
 
-local ACCENT = "|cffc9a45c%s|r"
-local GOOD, WARN = "|cff4fbf6b%s|r", "|cffe0b040%s|r"
+local Paint = Chui.Theme.Paint
 
 local parts, rows = {}, {}
 
@@ -29,8 +28,8 @@ local function Paragraphs(...)
     return table.concat(parts, "\n\n")
 end
 
-function Quest:Show(title, body, primary, listRows)
-    Chui.Host:Present(self, {
+function Quest:Show(title, body, primary, listRows, owner)
+    Chui.Host:Present(owner or self, {
         width = Chui.Theme.tokens.width.quest,
         title = title,
         subtitle = UnitName("npc"),
@@ -100,7 +99,7 @@ function Quest:QUEST_DETAIL(questStartItemID)
 
     self:Show(GetTitleText(), Paragraphs(
         GetQuestText(),
-        ACCENT:format(QUEST_OBJECTIVES) .. "\n" .. GetObjectiveText()
+        Paint("accent", QUEST_OBJECTIVES) .. "\n" .. GetObjectiveText()
     ), primary)
     Chui:Debug(("quest detail render %.2f ms"):format(debugprofilestop() - t0))
 end
@@ -112,7 +111,7 @@ function Quest:QUEST_PROGRESS()
     local completable = IsQuestCompletable()
     self:Show(GetTitleText(), Paragraphs(
         GetProgressText(),
-        completable and GOOD:format("Ready to turn in.") or WARN:format("Not complete yet.")
+        completable and Paint("good", "Ready to turn in.") or Paint("warn", "Not complete yet.")
     ), { text = CONTINUE, onClick = CompleteQuest, enabled = completable })
     Chui:Debug(("quest progress render %.2f ms"):format(debugprofilestop() - t0))
 end
@@ -125,9 +124,9 @@ function Quest:QUEST_COMPLETE()
     local money = GetQuestMoneyToGet()
     local note, primary
     if choices > 1 then
-        note = WARN:format(("%d reward choices: reward picking arrives in M1. Use the bypass modifier for now."):format(choices))
+        note = Paint("warn", ("%d reward choices: reward picking arrives in M1. Use the bypass modifier for now."):format(choices))
     elseif money and money > 0 then
-        note = WARN:format("This turn-in costs gold and needs a confirmation (M1). Use the bypass modifier for now.")
+        note = Paint("warn", "This turn-in costs gold and needs a confirmation (M1). Use the bypass modifier for now.")
     end
     if not note then
         -- Same rule as QuestRewardCompleteButton_OnClick: one choice is picked
@@ -144,6 +143,45 @@ end
 
 function Quest:QUEST_FINISHED()
     Chui.Host:Dismiss(self)
+end
+
+---------------------------------------------------------------------------
+-- Fixture for /chui test quest: a long detail page with Accept, so scrolling,
+-- the fixed footer and the Space key can all be tried without a quest giver.
+-- Uses a stand-in owner so closing it doesn't call CloseQuest().
+---------------------------------------------------------------------------
+local FIXTURE_PARAGRAPHS = {
+    "The road north of the ford has been quiet for three seasons, and quiet is exactly what worries me. "
+        .. "Caravans that once came every week now come never, and the last rider to pass through swore the "
+        .. "watchfires at the pass had been put out from the inside.",
+    "I would send one of my own, but every hand I have is tied to the harvest, and the captain will not "
+        .. "spare a single spear until the snows. That leaves you. You have the look of someone who has "
+        .. "walked into worse and walked out again, and I am past being proud about who I ask.",
+    "Go to the pass. Do not stop at the ford, and do not trust the old bridge, which has not held weight "
+        .. "since the flood. Follow the drainage ditch along the east wall instead; it is wet, foul, and "
+        .. "nobody is watching it. When you reach the watchtower, count the fires. There should be seven.",
+    "If there are fewer than seven, come back at once and tell no one but me. If there are more, well. "
+        .. "Then something has been lighting them that is not one of ours, and I would very much like to "
+        .. "know what warms itself on a border it has no business crossing.",
+    "Whatever you find, bring proof. A banner, a blade, a scrap of cloth, I do not care. The council will "
+        .. "not move on a story, and I am tired of being the only voice at the table that remembers what "
+        .. "the last silence cost us.",
+    "I cannot pay much now, but there is a chest under my bed that has been waiting for a reason. "
+        .. "Come back alive, and it is yours.",
+}
+
+local fixtureOwner = {}
+
+function Quest:ShowFixture()
+    local t0 = debugprofilestop()
+    self:Show("The Silent Pass", Paragraphs(
+        table.concat(FIXTURE_PARAGRAPHS, "\n\n"),
+        Paint("accent", QUEST_OBJECTIVES) .. "\nLight the seventh watchfire at the Silent Pass."
+    ), {
+        text = ACCEPT,
+        onClick = function() Chui:Print("test: Accept pressed (nothing is accepted)") end,
+    }, nil, fixtureOwner)
+    Chui:Debug(("quest fixture render %.2f ms"):format(debugprofilestop() - t0))
 end
 
 -- The player closed our panel. Known gap vs Blizzard's QuestFrame_OnHide:

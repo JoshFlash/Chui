@@ -73,23 +73,23 @@ Chui:RegisterCommand("apicheck", "dev: verify every API and event Chui uses exis
     for _, name in ipairs(FUNCTIONS) do
         if type(Resolve(name)) ~= "function" then
             missing = missing + 1
-            print("  |cffd05a5amissing function|r", name)
+            print("  " .. Chui.Theme.Paint("bad", "missing function"), name)
         end
     end
     for _, event in ipairs(EVENTS) do
         if not C_EventUtils.IsEventValid(event) then
             missing = missing + 1
-            print("  |cffd05a5aunknown event|r", event)
+            print("  " .. Chui.Theme.Paint("bad", "unknown event"), event)
         end
     end
     for _, key in ipairs({ "Gossip", "QuestGiver", "Merchant", "Trainer" }) do
         if not Enum.PlayerInteractionType[key] then
             missing = missing + 1
-            print("  |cffd05a5amissing enum|r Enum.PlayerInteractionType." .. key)
+            print("  " .. Chui.Theme.Paint("bad", "missing enum") .. " Enum.PlayerInteractionType." .. key)
         end
     end
     local _, build, _, toc = GetBuildInfo()
     Chui:Print(("apicheck on %d (build %s): %d functions, %d events, %s")
         :format(toc, build, #FUNCTIONS, #EVENTS,
-            missing == 0 and "|cff4fbf6ball present|r" or ("|cffd05a5a%d problems|r"):format(missing)))
+            missing == 0 and Chui.Theme.Paint("good", "all present") or Chui.Theme.Paint("bad", ("%d problems"):format(missing))))
 end)

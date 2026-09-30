@@ -15,6 +15,7 @@ embeds.xml
 Core\Init.lua
 Core\EventBus.lua
 Core\Theme.lua
+Core\Layout.lua
 Core\Config.lua
 Core\Host.lua
 Core\Suppressor.lua

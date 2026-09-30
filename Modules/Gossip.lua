@@ -11,7 +11,7 @@ local Gossip = Chui:NewModule("Gossip")
 Gossip.kind = "gossip"
 Gossip.events = { "GOSSIP_SHOW", "GOSSIP_CLOSED" }
 
-local GREY = "|cff808080"
+local Paint = Chui.Theme.Paint
 
 ---------------------------------------------------------------------------
 -- State: API reads -> plain table (Section 3, "State in, pixels out")
@@ -56,7 +56,7 @@ function Gossip:Render(s, owner)
     local icons = Chui.Theme.tokens.icons
     for _, q in ipairs(s.available) do
         rows[#rows + 1] = {
-            text = q.isTrivial and (GREY .. q.title .. "|r") or q.title,
+            text = q.isTrivial and Paint("dim", q.title) or q.title,
             atlas = icons.offer.atlas, icon = icons.offer.file, muted = q.isTrivial,
             onClick = live and function() C_GossipInfo.SelectAvailableQuest(q.questID) end,
         }
@@ -128,13 +128,41 @@ end
 local FIXTURE = {
     title = "Innkeeper Velra",
     subtitle = "Silvermoon City",
-    text = "Welcome, traveler. The fire is warm and the beds are clean.",
-    available = { { title = "A Fresh Start" } },
-    active = { { title = "Supplies for the Front", isComplete = true } },
+    text = table.concat({
+        "Welcome, traveler. The fire is warm and the beds are clean.",
+        "You look like you have been on the road a long while. Sit, rest, and let me take that pack. "
+            .. "We get all kinds through here: couriers from the capital, caravan guards between shifts, "
+            .. "the odd scholar chasing a rumour about the old vaults under the hill.",
+        "If you are after work, there is always something. The front needs supplies, the stables need "
+            .. "hands, and there is a standing bounty on whatever has been scaring the herds at night. "
+            .. "Ask around, but mind the prices, and never trust a man who will not sit with his back to the wall.",
+        "And if you only want a room, that is easily done. Breakfast is included, the bells are silent "
+            .. "until the second hour, and nobody will ask you a single question you do not want to answer.",
+    }, "\n\n"),
+    available = {
+        { title = "A Fresh Start" },
+        { title = "The Missing Shipment", isTrivial = true },
+        { title = "Whispers in the Vaults" },
+    },
+    active = {
+        { title = "Supplies for the Front", isComplete = true },
+        { title = "Herd Trouble", isComplete = false },
+    },
     options = {
         { name = "Make this inn your home." },
         { name = "Let me browse your goods." },
         { name = "I'd like to rent a room." },
+        { name = "I need to send a letter." },
+        { name = "Can you teach me to cook?" },
+        { name = "What news from the capital?" },
+        { name = "Who else is staying here?" },
+        { name = "Tell me about the old vaults." },
+        { name = "Where can I find the stable master?" },
+        { name = "I'm looking for a guild." },
+        { name = "Do you have any rumours?" },
+        { name = "I'd like to hear a story." },
+        { name = "Show me the way to the market." },
+        { name = "Never mind." },
     },
 }
 local fixtureOwner = {}

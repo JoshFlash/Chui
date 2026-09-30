@@ -2,16 +2,18 @@
 -- The single shared, centered panel every interaction renders into
 -- (Sections 5.1 and 7).
 --
--- Scaffold version: fixed anatomy (title, subtitle, body text, clickable
--- rows, one primary button, close button) laid out by hand. In M1 this becomes a generic container for module views
--- with header / scrollable body / footer, max-height clamping and pooled
--- widgets. The public shape (Present, Dismiss, OnHostClosed) stays the same.
+-- Three regions: a header (title, subtitle), a body that scrolls when the
+-- content is taller than the screen allows, and a footer (primary button).
+-- Header and footer never scroll. Sizes and placement come from Core/Layout.lua;
+-- this file measures text and owns the frames. Pooled widgets arrive with
+-- CHUI-5. The public shape (Present, Dismiss, OnHostClosed) is unchanged.
 local _, Chui = ...
 
 local Host = {}
 Chui.Host = Host
 
 local T -- theme tokens, bound in Init
+local Layout -- Chui.Layout, bound in Init
 local CLOSE_BUTTON_ROOM = 24 -- keeps the title clear of the close button
 
 -- Four 1-pixel edges. PixelUtil snaps to the physical pixel grid for the
@@ -44,6 +46,7 @@ end
 
 function Host:Init()
     T = Chui.Theme.tokens
+    Layout = Chui.Layout
 
     -- Named so it can go in UISpecialFrames (Escape closes it).
     local f = CreateFrame("Frame", "ChuiHostFrame", UIParent)
@@ -66,7 +69,22 @@ function Host:Init()
     self.subtitle:SetJustifyH("LEFT")
     self.subtitle:SetTextColor(unpack(T.text.secondary))
 
-    self.body = f:CreateFontString(nil, "OVERLAY", T.font.body)
+    -- Body: a scroll frame holds the text and the rows. The mouse wheel
+    -- scrolls it by one row; a thin indicator on the right shows position.
+    local scroll = CreateFrame("ScrollFrame", nil, f)
+    scroll:EnableMouseWheel(true)
+    scroll:SetScript("OnMouseWheel", function(_, delta) Host:ScrollBy(-delta * T.space.row) end)
+    local child = CreateFrame("Frame", nil, scroll)
+    scroll:SetScrollChild(child)
+    self.scroll, self.child = scroll, child
+
+    local thumb = f:CreateTexture(nil, "OVERLAY")
+    thumb:SetColorTexture(T.edge.accent[1], T.edge.accent[2], T.edge.accent[3], 0.6)
+    thumb:SetWidth(T.space.scrollbar)
+    thumb:Hide()
+    self.thumb = thumb
+
+    self.body = child:CreateFontString(nil, "OVERLAY", T.font.body)
     self.body:SetJustifyH("LEFT")
     self.body:SetJustifyV("TOP")
     self.body:SetSpacing(2)
@@ -101,6 +119,12 @@ function Host:Init()
     f:SetScript("OnHide", function() Host:OnHidden() end)
     tinsert(UISpecialFrames, "ChuiHostFrame")
 
+    -- Screen size or UI scale changed: lay the open panel out again.
+    local watcher = CreateFrame("Frame")
+    watcher:RegisterEvent("UI_SCALE_CHANGED")
+    watcher:RegisterEvent("DISPLAY_SIZE_CHANGED")
+    watcher:SetScript("OnEvent", function() Host:Refresh() end)
+
     self.frame = f
 end
 
@@ -123,7 +147,7 @@ end
 function Host:AcquireRow(i)
     local row = self.rowPool[i]
     if not row then
-        row = CreateFrame("Button", nil, self.frame)
+        row = CreateFrame("Button", nil, self.child)
         row:SetHeight(T.space.row)
         -- A Button's HIGHLIGHT layer draws above OVERLAY text and would cover
         -- it, so the hover tint is a BACKGROUND texture we toggle ourselves.
@@ -168,18 +192,21 @@ local function ApplyRowIcon(row, r)
     text:SetPoint("RIGHT", -8, 0)
 end
 
--- Lay out content, size to fit, center, show. Synchronous: the panel is
+-- Lay out content, size to fit, place, show. Synchronous: the panel is
 -- complete before this returns (Section 3, "Render on the event").
 -- content = { title, subtitle, body, width,
 --             rows = { { text, onClick, atlas, icon, muted }, ... } (optional),
 --             primary = { text, onClick, enabled } (optional) }
 function Host:Present(owner, content)
-    local f = self.frame
+    local f, child, scroll, cfg = self.frame, self.child, self.scroll, Chui.cfg
     local pad = T.space.pad
     local width = content.width or T.width.default
     local inner = width - 2 * pad
-    local y = pad
+    local unit = PixelUtil.GetPixelToUIUnitFactor() / f:GetEffectiveScale()
+    local function snap(v) return Layout.Snap(v, unit) end
 
+    -- Header
+    local y = pad
     local title = self.title
     title:SetWidth(inner - CLOSE_BUTTON_ROOM)
     title:SetText(content.title or "")
@@ -199,18 +226,19 @@ function Host:Present(owner, content)
     else
         subtitle:Hide()
     end
+    local headerH = snap(y + T.space.section)
 
-    y = y + T.space.section
+    -- Body content, laid out from the top of the scroll child
     local body = self.body
     body:SetWidth(inner)
     body:SetText(content.body or "") -- text metrics are available immediately
     body:ClearAllPoints()
-    body:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -y)
-    y = y + body:GetStringHeight()
+    body:SetPoint("TOPLEFT", child, "TOPLEFT", 0, 0)
+    local cy = body:GetStringHeight()
 
     local rows, used = content.rows, 0
     if rows and #rows > 0 then
-        y = y + T.space.section
+        if cy > 0 then cy = cy + T.space.section end
         for i, r in ipairs(rows) do
             local row = self:AcquireRow(i)
             row.text:SetText(r.text)
@@ -218,44 +246,92 @@ function Host:Present(owner, content)
             row.action = r.onClick
             row:SetWidth(inner)
             row:ClearAllPoints()
-            row:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -y)
+            row:SetPoint("TOPLEFT", child, "TOPLEFT", 0, -cy)
             row:Show()
-            y = y + T.space.row
+            cy = cy + T.space.row
             used = i
         end
     end
     for i = used + 1, #self.rowPool do self.rowPool[i]:Hide() end
+    local contentH = snap(cy)
 
+    -- Footer: the primary button, bottom-right, then the bottom padding
     local p, button = content.primary, self.primary
+    local footerH = pad
     if p then
-        y = y + T.space.section
         button:SetText(p.text)
         button:SetWidth(math.max(96, button:GetTextWidth() + 32))
         button:SetEnabled(p.enabled ~= false)
         self.primaryAction = p.onClick
         button:Show()
-        y = y + button:GetHeight()
+        footerH = footerH + T.space.section + button:GetHeight()
     else
         self.primaryAction = nil
         button:Hide()
     end
-    y = y + pad
 
-    -- TODO(M1): clamp to maxHeightPct and scroll the body beyond it.
+    local fit = Layout.Fit({
+        header = headerH,
+        content = contentH,
+        footer = snap(footerH),
+        maxHeight = Layout.MaxHeight(UIParent:GetHeight(), cfg.maxHeightPct, T.space.safe),
+        minViewport = T.space.row,
+    })
+
+    child:SetSize(inner, contentH)
+    scroll:ClearAllPoints()
+    scroll:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -headerH)
+    scroll:SetSize(inner, fit.viewport)
+    scroll:SetVerticalScroll(0)
+
     self.owner = owner
+    self.lastContent = content
+    self.fit, self.headerH, self.contentH = fit, headerH, contentH
     self.spaceHeld = IsKeyDown("SPACE") -- a press already down belongs to the previous view
-    self:Place(width, math.ceil(y))
+    self:UpdateThumb(0)
+    self:Place(width, fit.height)
     f:Show()
 end
 
--- Section 7.1, "Center" anchor mode.
+-- Mouse wheel and friends. Clamped to the scrollable range.
+function Host:ScrollBy(delta)
+    local fit = self.fit
+    if not fit or not fit.scroll then return end
+    local target = Layout.Clamp(self.scroll:GetVerticalScroll() + delta, 0, fit.maxScroll)
+    self.scroll:SetVerticalScroll(target)
+    self:UpdateThumb(target)
+end
+
+function Host:UpdateThumb(scrollPos)
+    local fit, thumb = self.fit, self.thumb
+    if not fit.scroll then
+        thumb:Hide()
+        return
+    end
+    local height, offset = Layout.Thumb(fit.viewport, self.contentH, scrollPos, fit.viewport, 16)
+    thumb:SetHeight(height)
+    thumb:ClearAllPoints()
+    thumb:SetPoint("TOPRIGHT", self.frame, "TOPRIGHT", -(T.space.pad - T.space.scrollbar) / 2, -(self.headerH + offset))
+    thumb:Show()
+end
+
+-- Section 7.1: always centred (with the configured nudge), kept inside the
+-- safe margins. A draggable window is planned to replace this.
 function Host:Place(width, height)
     local f, cfg = self.frame, Chui.cfg
-    local screenH = UIParent:GetHeight()
+    local x, y = Layout.Place(UIParent:GetWidth(), UIParent:GetHeight(), width, height, {
+        offsetXPct = cfg.offsetXPct, offsetYPct = cfg.offsetYPct, safe = T.space.safe,
+    })
     PixelUtil.SetSize(f, width, height)
     f:ClearAllPoints()
-    PixelUtil.SetPoint(f, "CENTER", UIParent, "CENTER",
-        cfg.offsetX, math.floor(screenH * cfg.offsetYPct))
+    PixelUtil.SetPoint(f, "CENTER", UIParent, "CENTER", x, y)
+end
+
+-- Lay the open panel out again (screen size or UI scale changed).
+function Host:Refresh()
+    if self.frame and self.frame:IsShown() and self.owner and self.lastContent then
+        self:Present(self.owner, self.lastContent)
+    end
 end
 
 -- Closing is two-way (Section 5.4):

@@ -14,7 +14,7 @@ local _, Chui = ...
 local Config = {}
 Chui.Config = Config
 
-local SCHEMA = 2 -- 1 was the plain-table scaffold (settings at the ChuiDB root)
+local SCHEMA = 3 -- 1 was the plain-table scaffold (settings at the ChuiDB root)
 
 local defaults = {
     profile = {
@@ -33,8 +33,9 @@ local defaults = {
             merchant = true,
         },
         layout = {
-            offsetX = 400.0,
-            offsetYPct = 0.08, -- nudge up 8% of screen height (Section 7.1)
+            offsetXPct = 0.23,   -- nudge right 23% of screen width
+            offsetYPct = 0.08,   -- nudge up 8% of screen height
+            maxHeightPct = 0.64, -- panel height cap; taller content scrolls
         },
     },
     global = {
@@ -56,10 +57,18 @@ MIGRATIONS[2] = function(adb)
     if root.debug ~= nil then profile.debug = root.debug end
     if root.bypassKey ~= nil then profile.bypassKey = root.bypassKey end
     for name, on in pairs(root.modules or {}) do profile.modules[name] = on end
-    for key, value in pairs(root.layout or {}) do profile.layout[key] = value end
+    local layout = root.layout or {}
+    if layout.offsetYPct ~= nil then profile.layout.offsetYPct = layout.offsetYPct end
     for _, key in ipairs({ "schema", "debug", "bypassKey", "modules", "suppress", "layout", "trace" }) do
         root[key] = nil
     end
+end
+
+-- 2 -> 3: the horizontal offset became a share of the screen width
+-- (offsetXPct) instead of a fixed number of units (offsetX). The old value
+-- depended on the screen size, so it isn't converted; the default applies.
+MIGRATIONS[3] = function(adb)
+    adb.profile.layout.offsetX = nil
 end
 
 local function Migrate(adb)
@@ -84,8 +93,9 @@ function Config:Rebuild()
     local p, cfg = Chui.db, Chui.cfg
     cfg.debug = p.debug
     cfg.bypassKey = p.bypassKey
-    cfg.offsetX = p.layout.offsetX
+    cfg.offsetXPct = p.layout.offsetXPct
     cfg.offsetYPct = p.layout.offsetYPct
+    cfg.maxHeightPct = p.layout.maxHeightPct
 end
 
 local function Bind()
@@ -123,8 +133,19 @@ end
 -- Slash commands. Subcommands live in Chui.commands so any file (Dev/
 -- tools included) can add its own with Chui:RegisterCommand.
 ---------------------------------------------------------------------------
-Chui:RegisterCommand("test", "show the gossip panel with sample data", function()
-    Chui.modules.Gossip:ShowFixture()
+-- Sample panels, no NPC needed. The long text, many rows and big vendor
+-- exist to exercise scrolling and the max-height clamp.
+local FIXTURE_KINDS = { "gossip", "quest", "merchant" }
+
+Chui:RegisterCommand("test", "[gossip/quest/merchant] - show a long sample panel (default gossip)", function(arg)
+    local kind = arg:lower()
+    if kind == "" then kind = "gossip" end
+    local module = Chui:FindModule(kind)
+    if not (module and module.ShowFixture) then
+        Chui:Print("usage: /chui test [" .. table.concat(FIXTURE_KINDS, "/") .. "]")
+        return
+    end
+    module:ShowFixture()
 end)
 
 Chui:RegisterCommand("debug", "toggle timing and debug output", function()
@@ -148,10 +169,10 @@ Chui:RegisterCommand("toggle", "<module> - enable or disable a module (no reload
     Chui:Print(module.name, module.enabled and "enabled" or "disabled")
 end)
 
-Chui:RegisterCommand("suppress", "<gossip|quest|merchant> [on|off] - hide Blizzard's window for that kind", function(arg)
+Chui:RegisterCommand("suppress", "<gossip/quest/merchant> [on/off] - hide Blizzard's window for that kind", function(arg)
     local kind, value = arg:lower():match("^(%S*)%s*(%S*)$")
     if not Chui.Suppressor:IsKnownKind(kind) then
-        Chui:Print("usage: /chui suppress <gossip|quest|merchant> [on|off]")
+        Chui:Print("usage: /chui suppress <gossip/quest/merchant> [on/off]")
         return
     end
     local on
@@ -164,7 +185,7 @@ Chui:RegisterCommand("suppress", "<gossip|quest|merchant> [on|off] - hide Blizza
         Chui.Suppressor:IsEngaged(kind) == on and "" or " (applies when no NPC window is open)"))
 end)
 
-Chui:RegisterCommand("suppress-all", "[on|off] - hide Blizzard's window for every kind (no argument: toggle)", function(arg)
+Chui:RegisterCommand("suppress-all", "[on/off] - hide Blizzard's window for every kind (no argument: toggle)", function(arg)
     local value = arg:lower()
     local on
     if value == "on" then on = true
@@ -175,7 +196,7 @@ Chui:RegisterCommand("suppress-all", "[on|off] - hide Blizzard's window for ever
             if not Chui.db.suppress[kind] then on = true end
         end
     else
-        Chui:Print("usage: /chui suppress-all [on|off]")
+        Chui:Print("usage: /chui suppress-all [on/off]")
         return
     end
     for kind in pairs(Chui.db.suppress) do
@@ -185,10 +206,10 @@ Chui:RegisterCommand("suppress-all", "[on|off] - hide Blizzard's window for ever
     Chui:Print("suppress all:", on and "on" or "off", "(applies to each kind when no NPC window is open)")
 end)
 
-Chui:RegisterCommand("bypass", "<shift|ctrl|alt|none> - modifier that shows the default window", function(arg)
+Chui:RegisterCommand("bypass", "<shift/ctrl/alt/none> - modifier that shows the default window", function(arg)
     local key = arg:upper()
     if key ~= "SHIFT" and key ~= "CTRL" and key ~= "ALT" and key ~= "NONE" then
-        Chui:Print("usage: /chui bypass <shift|ctrl|alt|none>")
+        Chui:Print("usage: /chui bypass <shift/ctrl/alt/none>")
         return
     end
     Chui.db.bypassKey = key

@@ -25,15 +25,20 @@ end
 ---------------------------------------------------------------------------
 -- Output
 ---------------------------------------------------------------------------
-local PREFIX = "|cffc9a45cChui|r:"
+-- Theme loads after this file, so the prefix is built when it is first needed.
+local prefix
+local function Prefix()
+    prefix = prefix or Chui.Theme.Paint("accent", "Chui") .. ":"
+    return prefix
+end
 
 function Chui:Print(...)
-    print(PREFIX, ...)
+    print(Prefix(), ...)
 end
 
 function Chui:Debug(...)
     if self.cfg.debug then
-        print(PREFIX, "|cff9aa3b5[debug]|r", ...)
+        print(Prefix(), Chui.Theme.Paint("muted", "[debug]"), ...)
     end
 end
 

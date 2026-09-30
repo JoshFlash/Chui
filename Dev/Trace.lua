@@ -41,7 +41,7 @@ local function Log(text)
     local log = Chui.adb.global.trace
     log[#log + 1] = line
     if #log > MAX_LINES then table.remove(log, 1) end
-    print("|cff9aa3b5[trace]|r", line)
+    print(Chui.Theme.Paint("muted", "[trace]"), line)
 end
 
 listener:SetScript("OnEvent", function(_, event, ...)
