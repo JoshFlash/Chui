@@ -32,6 +32,7 @@ local defaults = {
             quest = true,
             merchant = true,
         },
+        parchment = true, -- paper background for gossip and quest panels
         font = {
             face = "classicabook", -- a key from Fonts:List(); "default" is the game font
             scale = 1.0,      -- 0.85 to 1.4
@@ -97,6 +98,7 @@ function Config:Rebuild()
     local p, cfg = Chui.db, Chui.cfg
     cfg.debug = p.debug
     cfg.bypassKey = p.bypassKey
+    cfg.parchment = p.parchment
     cfg.offsetXPct = p.layout.offsetXPct
     cfg.offsetYPct = p.layout.offsetYPct
     cfg.maxHeightPct = p.layout.maxHeightPct
@@ -151,17 +153,19 @@ end
 ---------------------------------------------------------------------------
 -- Sample panels, no NPC needed. The long text, many rows and big vendor
 -- exist to exercise scrolling and the max-height clamp.
-local FIXTURE_KINDS = { "gossip", "quest", "merchant" }
+local FIXTURE_KINDS = { "gossip", "quest", "merchant", "reward" }
 
 Chui:RegisterCommand("test", "[gossip/quest/merchant] - show a long sample panel (default gossip)", function(arg)
     local kind = arg:lower()
     if kind == "" then kind = "gossip" end
-    local module = Chui:FindModule(kind)
-    if not (module and module.ShowFixture) then
+    -- "reward" is the quest module's second sample, the quest-complete view.
+    local module = Chui:FindModule(kind == "reward" and "quest" or kind)
+    local show = module and (kind == "reward" and module.ShowRewardFixture or module.ShowFixture)
+    if not show then
         Chui:Print("usage: /chui test [" .. table.concat(FIXTURE_KINDS, "/") .. "]")
         return
     end
-    module:ShowFixture()
+    show(module)
 end)
 
 Chui:RegisterCommand("debug", "toggle timing and debug output", function()

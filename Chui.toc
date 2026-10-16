@@ -1,4 +1,4 @@
-## Interface: 120100, 120105
+## Interface: 16001, 120100, 120105
 ## Title: Chui
 ## Notes: Instant, centered replacement panels for NPC interactions.
 ## Author: Tattva
@@ -17,6 +17,7 @@ Core\EventBus.lua
 Core\Theme.lua
 Core\Layout.lua
 Media\Fonts.lua
+Media\Skins.lua
 Core\Fonts.lua
 Core\Config.lua
 Options\Options.lua
@@ -32,4 +33,6 @@ Modules\Merchant.lua
 Dev\Trace.lua
 Dev\ApiCheck.lua
 Dev\FontInfo.lua
+Dev\BuildInfo.lua
+Dev\PlaceholderArt.lua
 #@end-debug@

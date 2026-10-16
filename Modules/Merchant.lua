@@ -207,6 +207,7 @@ function Merchant:Render(s, owner)
     local t0 = debugprofilestop()
     local live = owner == nil
     local buyback = self.tab == "buyback"
+    Chui.Theme.Use("dark")
     wipe(rows)
 
     for _, item in ipairs(buyback and s.buyback or s.items) do

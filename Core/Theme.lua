@@ -20,8 +20,12 @@ local HEX = {
     bad    = "d05a5a",
 }
 
+-- The active skin can swap any of these for colours that read on its
+-- background (see Theme.skins below).
 function Theme.Paint(name, text)
-    return "|cff" .. HEX[name] .. text .. "|r"
+    local skin = Theme.skins and Theme.skins[Theme.active]
+    local hex = (skin and skin.hex and skin.hex[name]) or HEX[name]
+    return "|cff" .. hex .. text .. "|r"
 end
 
 Theme.tokens = {
@@ -45,6 +49,9 @@ Theme.tokens = {
         icon    = 24, -- row icon size
         tab     = 24, -- height of a header tab button
         edge    = 2,  -- panel border thickness, in physical pixels
+        plate   = 44, -- minimum height of the NPC-name plate (art skins)
+        plateCap = 42, -- width of each end of the plate
+        plateMargin = 10, -- space above and below the name on its plate
         safe    = 24, -- minimum gap between the panel and the screen edge
         scrollbar = 3, -- scroll indicator width
     },
@@ -65,6 +72,53 @@ Theme.tokens = {
     width = {
         default = 480,
         gossip  = 480,
-        quest   = 540,
+        quest   = 480,
     },
 }
+
+-- Skins: a panel's look. `dark` is the token set above. `parchment` is paper
+-- with ink-coloured text; its art comes from Media/Skins.lua, and `surface`
+-- (with `edge`) is what is drawn if that art isn't available. A view calls
+-- Theme.Use(name) before it builds its text, so Theme.Paint picks colours that
+-- read on the skin, and passes skin = name to Host:Present.
+Theme.skins = {
+    dark = {
+        text = Theme.tokens.text,
+        surface = Theme.tokens.surface.base,
+        edge = Theme.tokens.edge.accent,
+        highlight = Theme.tokens.surface.raised,
+        selected = { 0.788, 0.643, 0.361, 0.22 }, -- the chosen row, e.g. a quest reward
+        thumb = { Theme.tokens.edge.accent[1], Theme.tokens.edge.accent[2], Theme.tokens.edge.accent[3], 0.6 },
+    },
+    parchment = {
+        art = "parchment",
+        text = {
+            primary   = { 0.15, 0.14, 0.10, 1 }, -- dark ink
+            secondary = { 0.38, 0.30, 0.22, 1 },
+        },
+        surface = { 0.80, 0.68, 0.50, 1 },
+        -- Multiplies the paper art's colours: below 1 darkens, and uneven
+        -- values shift the hue. This is a warmer, browner paper.
+        paperTint = { 0.76, 0.72, 0.67, 0.96 },
+        edge = { 0.03, 0.02, 0.01, 0.95 }, -- very dark brown
+        edgeWidth = 5, -- the frame the paper is cut off at
+        highlight = { 0.72, 0.62, 0.48, 0.24 },
+        selected = { 0.42, 0.28, 0.08, 0.28 },
+        thumb = { 0.40, 0.28, 0.15, 0.7 },
+        hex = {
+            accent = "7a4b12", muted = "6b5a44", dim = "8a7c68",
+            good = "2f6b3a", warn = "8a5a00", bad = "9a2b2b",
+        },
+    },
+}
+Theme.active = "dark"
+
+function Theme.Use(name)
+    Theme.active = Theme.skins[name] and name or "dark"
+    return Theme.active
+end
+
+-- The skin dialogue panels (gossip, quests) use, from the settings.
+function Theme.DialogueSkin()
+    return Chui.cfg.parchment and "parchment" or "dark"
+end

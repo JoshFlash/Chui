@@ -1,9 +1,11 @@
 -- Modules/Quest.lua
--- Stub for the quest panels: greeting, detail, progress, complete.
--- Text, clickable greeting rows, plus one primary button (Space presses it) for the simple cases so a suppressed
--- quest flow can be exercised end to end. Anything the stub can't do yet
--- (reward choice, PvP confirm, expensive turn-in) says so: close the panel
--- and talk again holding the bypass modifier.
+-- The quest panels: greeting, detail, progress, complete.
+-- Text, clickable greeting rows, and one primary button (Space presses it).
+-- The complete view lists the quest's rewards: you pick one of the choices (click,
+-- or its number key) and the Complete button stays off until you have; each reward
+-- has the item tooltip on hover. Anything not done yet (PvP accept confirm,
+-- paid turn-ins) says so: close the panel and talk again holding the bypass
+-- modifier.
 --
 -- Parity rules copied from QuestFrame_OnEvent (FrameXML 12.1.0): some
 -- QUEST_DETAIL events never show QuestFrame at all. Those are forwarded to
@@ -12,7 +14,8 @@ local _, Chui = ...
 
 local Quest = Chui:NewModule("Quest")
 Quest.kind = "quest"
-Quest.events = { "QUEST_GREETING", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE", "QUEST_FINISHED" }
+Quest.events = { "QUEST_GREETING", "QUEST_DETAIL", "QUEST_PROGRESS", "QUEST_COMPLETE", "QUEST_FINISHED",
+    "QUEST_ITEM_UPDATE" }
 
 local Paint = Chui.Theme.Paint
 
@@ -28,7 +31,8 @@ local function Paragraphs(...)
     return table.concat(parts, "\n\n")
 end
 
-function Quest:Show(title, body, primary, listRows, owner)
+function Quest:Show(title, body, primary, listRows, owner, keepScroll)
+    local skin = Chui.Theme.Use(Chui.Theme.DialogueSkin())
     Chui.Host:Present(owner or self, {
         width = Chui.Theme.tokens.width.quest,
         title = title,
@@ -36,8 +40,27 @@ function Quest:Show(title, body, primary, listRows, owner)
         body = body,
         primary = primary,
         rows = listRows,
+        skin = skin,
         fixedHeight = true,
+        keepScroll = keepScroll,
     })
+end
+
+-- Right-clicking an available quest (in a gossip list or a quest greeting)
+-- accepts it as soon as its detail opens, without showing the panel. Asked
+-- for just before the quest is selected, and good for a few seconds.
+local AUTO_ACCEPT_WINDOW = 3
+
+function Quest:RequestAutoAccept()
+    self.autoAcceptUntil = GetTime() + AUTO_ACCEPT_WINDOW
+end
+
+-- A hint that follows the mouse pointer while it is over an available quest.
+function Quest.ShowAcceptHint(row)
+    GameTooltip:SetOwner(row, "ANCHOR_CURSOR")
+    GameTooltip:SetText("Right-click to accept", 0.3, 0.9, 0.4)
+    GameTooltip:AddLine("Left-click to read the quest", 0.8, 0.8, 0.8)
+    GameTooltip:Show()
 end
 
 -- QUEST_DETAIL cases where Blizzard shows no quest window: the quest
@@ -53,7 +76,9 @@ end
 -- Events
 ---------------------------------------------------------------------------
 function Quest:QUEST_GREETING()
+    Chui.Theme.Use(Chui.Theme.DialogueSkin()) -- before any Paint, so colours suit the skin
     if not Chui.Suppressor:ShouldRender("quest") then return end
+    self.view = "greeting"
     local t0 = debugprofilestop()
 
     wipe(rows)
@@ -63,7 +88,13 @@ function Quest:QUEST_GREETING()
             text = GetAvailableTitle(i),
             wrap = true,
             atlas = icons.offer.atlas, icon = icons.offer.file,
-            onClick = function() SelectAvailableQuest(i) end,
+            clicks = "AnyUp", -- right-click accepts the quest as soon as it opens
+            tooltip = Quest.ShowAcceptHint,
+            onClick = function(button)
+                if button ~= "LeftButton" and button ~= "RightButton" then return end
+                if button == "RightButton" then self:RequestAutoAccept() end
+                SelectAvailableQuest(i)
+            end,
         }
     end
     for i = 1, GetNumActiveQuests() do
@@ -81,6 +112,7 @@ function Quest:QUEST_GREETING()
 end
 
 function Quest:QUEST_DETAIL(questStartItemID)
+    Chui.Theme.Use(Chui.Theme.DialogueSkin()) -- before any Paint, so colours suit the skin
     local S = Chui.Suppressor
     if not S:ShouldRender("quest") then return end
 
@@ -88,6 +120,17 @@ function Quest:QUEST_DETAIL(questStartItemID)
         if S:IsEngaged("quest") then S:Forward("quest", "QUEST_DETAIL", questStartItemID) end
         return
     end
+    -- Asked to accept this one on sight. A PvP quest still wants its
+    -- confirmation, and an auto-accepted one is already taken.
+    if self.autoAcceptUntil then
+        local wanted = GetTime() <= self.autoAcceptUntil
+        self.autoAcceptUntil = nil
+        if wanted and not QuestFlagsPVP() and not QuestGetAutoAccept() then
+            AcceptQuest()
+            return
+        end
+    end
+    self.view = "detail"
     local t0 = debugprofilestop()
 
     local primary
@@ -108,7 +151,9 @@ function Quest:QUEST_DETAIL(questStartItemID)
 end
 
 function Quest:QUEST_PROGRESS()
+    Chui.Theme.Use(Chui.Theme.DialogueSkin()) -- before any Paint, so colours suit the skin
     if not Chui.Suppressor:ShouldRender("quest") then return end
+    self.view = "progress"
     local t0 = debugprofilestop()
 
     local completable = IsQuestCompletable()
@@ -119,32 +164,157 @@ function Quest:QUEST_PROGRESS()
     Chui:Debug(("quest progress render %.2f ms"):format(debugprofilestop() - t0))
 end
 
-function Quest:QUEST_COMPLETE()
-    if not Chui.Suppressor:ShouldRender("quest") then return end
-    local t0 = debugprofilestop()
+---------------------------------------------------------------------------
+-- Quest rewards: read them, draw them as rows, choose one.
+---------------------------------------------------------------------------
+local REWARD_ICON_SIZE = 30
+local UNUSABLE_TINT = { 1, 0.3, 0.3 }
 
-    local choices = GetNumQuestChoices()
-    local money = GetQuestMoneyToGet()
+local function QualityName(name, quality)
+    name = name or "..." -- item names arrive asynchronously; QUEST_ITEM_UPDATE redraws
+    local color = quality and ITEM_QUALITY_COLORS and ITEM_QUALITY_COLORS[quality]
+    if color and color.color then
+        return color.color:WrapTextInColorCode(name)
+    elseif color and color.hex then
+        return color.hex .. name .. "|r"
+    end
+    return name
+end
+
+-- API reads -> a plain table. `choices` are the items you pick one of;
+-- `rewards` are the ones you get regardless.
+function Quest:ReadRewards()
+    local state = {
+        choices = {}, rewards = {},
+        xp = GetRewardXP and GetRewardXP() or 0,
+        money = GetRewardMoney and GetRewardMoney() or 0,
+        title = GetRewardTitle and GetRewardTitle(),
+        moneyToGet = GetQuestMoneyToGet and GetQuestMoneyToGet() or 0,
+        text = GetRewardText(),
+        heading = GetTitleText(),
+    }
+    local function read(kind, count, list)
+        for i = 1, count do
+            local name, icon, number, quality, usable = GetQuestItemInfo(kind, i)
+            list[i] = {
+                kind = kind, index = i, name = name, icon = icon, count = number,
+                quality = quality, usable = usable ~= false, link = GetQuestItemLink(kind, i),
+            }
+        end
+    end
+    read("choice", GetNumQuestChoices(), state.choices)
+    read("reward", GetNumQuestRewards(), state.rewards)
+    return state
+end
+
+-- One reward row. `onSelect` makes it a choice; without it the row is just
+-- an item to look at. Hovering shows the item's own tooltip (the fixture, which
+-- has no real quest, shows just the name).
+local function RewardRow(item, live, selected, number, onSelect)
+    return {
+        text = QualityName(item.name, item.quality),
+        icon = item.icon,
+        iconSize = REWARD_ICON_SIZE,
+        count = item.count,
+        tint = not item.usable and UNUSABLE_TINT or nil,
+        selectable = onSelect ~= nil or selected,
+        selected = selected,
+        number = number,
+        clicks = "LeftButtonUp",
+        onClick = function()
+            -- Shift-click links the item, ctrl-click previews it, as on any item.
+            if live and item.link and HandleModifiedItemClick(item.link) then return end
+            if onSelect then onSelect() end
+        end,
+        tooltip = function(frame)
+            GameTooltip:SetOwner(frame, "ANCHOR_RIGHT")
+            if live then
+                GameTooltip:SetQuestItem(item.kind, item.index)
+            else
+                GameTooltip:SetText(item.name or "?")
+            end
+        end,
+    }
+end
+
+-- The complete view. `owner` is only passed by the fixture, whose Complete
+-- button must not touch the game.
+function Quest:ShowComplete(state, owner)
+    Chui.Theme.Use(Chui.Theme.DialogueSkin()) -- before any Paint, so colours suit the skin
+    local live = owner == nil
+    local choices = #state.choices
+    -- One choice is picked for you, as in Blizzard's own window.
+    local selected = choices == 1 and 1 or self.selectedChoice
+
+    wipe(rows)
+    local function choose(index)
+        self.selectedChoice = index
+        self:ShowComplete(state, owner)
+    end
+
+    if choices > 0 then
+        local heading = choices > 1 and "Choose your reward" or "Your reward"
+        rows[#rows + 1] = { text = Paint("accent", heading), inert = true, height = 30 }
+        for i, item in ipairs(state.choices) do
+            rows[#rows + 1] = RewardRow(item, live, selected == i, i <= 9 and i or nil,
+                choices > 1 and function() choose(i) end or nil)
+        end
+    end
+    if #state.rewards > 0 then
+        rows[#rows + 1] = { text = Paint("accent", "You will also receive"), inert = true, height = 30 }
+        for _, item in ipairs(state.rewards) do
+            rows[#rows + 1] = RewardRow(item, live, false, nil, nil)
+        end
+    end
+
+    -- Experience, money and title go with the quest's own text.
+    local summary = {}
+    if (state.xp or 0) > 0 then summary[#summary + 1] = ("Experience: %d"):format(state.xp) end
+    if (state.money or 0) > 0 then summary[#summary + 1] = "Money: " .. GetMoneyString(state.money, true) end
+    if state.title and state.title ~= "" then summary[#summary + 1] = "Title: " .. state.title end
+
+    -- The Complete button waits for a choice, and for a paid turn-in's
+    -- confirmation, which isn't built yet.
     local note, primary
-    if choices > 1 then
-        note = Paint("warn", ("%d reward choices: reward picking arrives in M1. Use the bypass modifier for now."):format(choices))
-    elseif money and money > 0 then
-        note = Paint("warn", "This turn-in costs gold and needs a confirmation (M1). Use the bypass modifier for now.")
+    if state.moneyToGet and state.moneyToGet > 0 then
+        note = Paint("warn", "This turn-in costs gold and needs a confirmation (not built yet). Use the bypass modifier for now.")
     end
-    if not note then
-        -- Same rule as QuestRewardCompleteButton_OnClick: one choice is picked
-        -- automatically, no choices means index 0.
-        local choice = choices == 1 and 1 or 0
-        primary = { text = COMPLETE_QUEST, onClick = function() GetQuestReward(choice) end }
-    else
-        primary = { text = COMPLETE_QUEST, enabled = false }
-    end
+    local ready = note == nil and (choices <= 1 or selected ~= nil)
+    primary = {
+        text = COMPLETE_QUEST,
+        enabled = ready,
+        onClick = function()
+            if live then
+                GetQuestReward(selected or 0)
+            else
+                Chui:Print(("test: Complete pressed, reward choice %s"):format(tostring(selected)))
+            end
+        end,
+    }
 
-    self:Show(GetTitleText(), Paragraphs(GetRewardText(), note), primary)
+    self:Show(state.heading, Paragraphs(state.text, table.concat(summary, "\n"), note), primary, rows, owner, true)
+end
+
+function Quest:QUEST_COMPLETE()
+    Chui.Theme.Use(Chui.Theme.DialogueSkin()) -- before any Paint, so colours suit the skin
+    if not Chui.Suppressor:ShouldRender("quest") then return end
+    self.view = "complete"
+    self.selectedChoice = nil
+    local t0 = debugprofilestop()
+    self:ShowComplete(self:ReadRewards())
     Chui:Debug(("quest complete render %.2f ms"):format(debugprofilestop() - t0))
 end
 
+-- Item names and icons load after the event; draw the rewards again, keeping
+-- the choice already made.
+function Quest:QUEST_ITEM_UPDATE()
+    if self.view == "complete" and Chui.Host:IsShownFor(self) then
+        self:ShowComplete(self:ReadRewards())
+    end
+end
+
 function Quest:QUEST_FINISHED()
+    self.view = nil
     Chui.Host:Dismiss(self)
 end
 
@@ -176,6 +346,7 @@ local FIXTURE_PARAGRAPHS = {
 local fixtureOwner = {}
 
 function Quest:ShowFixture()
+    Chui.Theme.Use(Chui.Theme.DialogueSkin()) -- before any Paint, so colours suit the skin
     local t0 = debugprofilestop()
     self:Show("The Silent Pass", Paragraphs(
         table.concat(FIXTURE_PARAGRAPHS, "\n\n"),
@@ -185,6 +356,36 @@ function Quest:ShowFixture()
         onClick = function() Chui:Print("test: Accept pressed (nothing is accepted)") end,
     }, nil, fixtureOwner)
     Chui:Debug(("quest fixture render %.2f ms"):format(debugprofilestop() - t0))
+end
+
+-- /chui test reward: the quest-complete view with four rewards to choose
+-- from and two you always get, so choosing, the check mark, the number keys
+-- and the tooltips can all be tried without handing in a quest.
+function Quest:ShowRewardFixture()
+    self.selectedChoice = nil
+    local function item(name, icon, quality, count, usable)
+        return { kind = "choice", index = 1, name = name, icon = "Interface\\Icons\\" .. icon, count = count,
+            quality = quality, usable = usable ~= false }
+    end
+    self:ShowComplete({
+        heading = "The Silent Pass",
+        text = "You counted the fires, and you brought proof. The council will listen now. Take your pick of what "
+            .. "I have kept for you; the rest of it is yours either way.",
+        xp = 1850,
+        money = 12750,
+        title = "Warden of the Pass",
+        moneyToGet = 0,
+        choices = {
+            item("Warden's Longsword", "INV_Sword_04", 3, 1),
+            item("Wayfarer's Cloak", "INV_Misc_Cape_18", 3, 1),
+            item("Sentinel's Shield", "INV_Shield_05", 3, 1, false),
+            item("Pouch of Silver Dust", "INV_Misc_Dust_01", 2, 5),
+        },
+        rewards = {
+            item("Healing Potion", "INV_Potion_54", 1, 3),
+            item("Honeyed Bread", "INV_Misc_Food_35", 1, 5),
+        },
+    }, fixtureOwner)
 end
 
 -- The player closed our panel. Known gap vs Blizzard's QuestFrame_OnHide:

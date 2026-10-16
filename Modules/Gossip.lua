@@ -50,6 +50,7 @@ local rows = {}
 
 -- `owner` is only passed by the fixture, whose rows must not call the game.
 function Gossip:Render(s, owner)
+    local skin = Chui.Theme.Use(Chui.Theme.DialogueSkin())
     wipe(rows)
     local live = owner == nil
 
@@ -59,7 +60,13 @@ function Gossip:Render(s, owner)
             text = q.isTrivial and Paint("dim", q.title) or q.title,
             wrap = true,
             atlas = icons.offer.atlas, icon = icons.offer.file, muted = q.isTrivial,
-            onClick = live and function() C_GossipInfo.SelectAvailableQuest(q.questID) end,
+            clicks = "AnyUp", -- right-click accepts the quest as soon as it opens
+            tooltip = Chui.modules.Quest.ShowAcceptHint, -- follows the pointer
+            onClick = live and function(button)
+                if button ~= "LeftButton" and button ~= "RightButton" then return end
+                if button == "RightButton" then Chui.modules.Quest:RequestAutoAccept() end
+                C_GossipInfo.SelectAvailableQuest(q.questID)
+            end,
         }
     end
     for _, q in ipairs(s.active) do
@@ -85,6 +92,7 @@ function Gossip:Render(s, owner)
         subtitle = s.subtitle,
         body = s.text,
         rows = rows,
+        skin = skin,
         fixedHeight = true,
     })
 end

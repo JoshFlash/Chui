@@ -38,13 +38,15 @@ local function AddPixelBorder(frame, thickness, r, g, b, a)
     right:SetPoint("TOPRIGHT")
     right:SetPoint("BOTTOMRIGHT")
 
-    for _, tex in ipairs({ top, bottom, left, right }) do
+    local edges = { top, bottom, left, right }
+    for _, tex in ipairs(edges) do
         tex:SetColorTexture(r, g, b, a)
     end
     PixelUtil.SetHeight(top, thickness, thickness)
     PixelUtil.SetHeight(bottom, thickness, thickness)
     PixelUtil.SetWidth(left, thickness, thickness)
     PixelUtil.SetWidth(right, thickness, thickness)
+    return edges
 end
 
 function Host:Init()
@@ -72,7 +74,22 @@ function Host:Init()
     local bg = f:CreateTexture(nil, "BACKGROUND")
     bg:SetAllPoints()
     bg:SetColorTexture(unpack(T.surface.base))
-    AddPixelBorder(f, T.space.edge, unpack(T.edge.accent))
+    self.bg = bg
+    self.edges = AddPixelBorder(f, T.space.edge, unpack(T.edge.accent))
+
+    -- Skin art: one paper texture filling the panel (a crop of the sheet's
+    -- solid middle, so the torn edges never show) and the name plate. All
+    -- hidden until a skin with art is applied. See Media/Skins.lua.
+    self.paper = f:CreateTexture(nil, "BACKGROUND", nil, -2)
+    self.paper:SetAllPoints()
+    self.paper:Hide()
+    -- The NPC-name plate: a left cap, a stretched middle and a right cap.
+    self.plate = {}
+    for i = 1, 3 do
+        local piece = f:CreateTexture(nil, "BACKGROUND", nil, -1)
+        piece:Hide()
+        self.plate[i] = piece
+    end
 
     -- Font objects derived from Blizzard's keep locale glyph coverage correct.
     self.title = f:CreateFontString(nil, "OVERLAY", Chui.Fonts.name.title)
@@ -135,7 +152,10 @@ function Host:Init()
     f:SetScript("OnKeyDown", function(_, key) Host:OnKeyDown(key) end)
     f:SetScript("OnKeyUp", function(_, key)
         if key == "SPACE" then Host.spaceHeld = false end
+        Host.heldKeys[key] = nil
     end)
+    self.numberRows = {} -- digit -> row, for rows that ask for a number key
+    self.heldKeys = {}
 
     local close = CreateFrame("Button", nil, f, "UIPanelCloseButton")
     close:SetPoint("TOPRIGHT", -2, -2)
@@ -159,6 +179,20 @@ end
 -- through several quest steps.
 function Host:OnKeyDown(key)
     local f, button = self.frame, self.primary
+
+    -- A digit presses the row that asked for that number (reward choices).
+    -- Like Space it is a fresh press only. Digits nobody asked for propagate,
+    -- so the action bars keep working.
+    local row = self.numberRows[tonumber(key) or 0]
+    if row and row:IsShown() and row.action then
+        f:SetPropagateKeyboardInput(false)
+        if not self.heldKeys[key] then
+            self.heldKeys[key] = true
+            row.action("LeftButton", row)
+        end
+        return
+    end
+
     if key ~= "SPACE" or not button:IsShown() or not button:IsEnabled() then
         f:SetPropagateKeyboardInput(true)
         return
@@ -177,6 +211,7 @@ function Host:AcquireRow(i)
         -- A Button's HIGHLIGHT layer draws above OVERLAY text and would cover
         -- it, so the hover tint is a BACKGROUND texture we toggle ourselves.
         local highlight = row:CreateTexture(nil, "BACKGROUND")
+        row.highlight = highlight
         highlight:SetAllPoints()
         highlight:SetColorTexture(unpack(T.surface.raised))
         highlight:Hide()
@@ -214,6 +249,18 @@ function Host:AcquireRow(i)
         count:SetJustifyH("RIGHT")
         row.count = count
 
+        -- The chosen row (a quest reward): a tinted background and a check mark.
+        local selection = row:CreateTexture(nil, "BACKGROUND", nil, 1)
+        selection:SetAllPoints()
+        selection:Hide()
+        row.selection = selection
+        local check = row:CreateTexture(nil, "OVERLAY")
+        check:SetSize(20, 20)
+        check:SetPoint("RIGHT", -8, 0)
+        check:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+        check:Hide()
+        row.check = check
+
         -- The action gets the mouse button and the row: (button, row).
         row:SetScript("OnClick", function(self, button)
             if self.action then self.action(button, self) end
@@ -239,6 +286,82 @@ function Host:AcquireTab(i)
     return tab
 end
 
+-- Point `texture` at one pixel region {left, right, top, bottom} of the art.
+local function SetRegion(texture, art, region)
+    local w, h = art.size[1], art.size[2]
+    texture:SetTexture(art.file)
+    texture:SetTexCoord(region[1] / w, region[2] / w, region[3] / h, region[4] / h)
+end
+
+-- Switch the panel to a skin: background art (or the plain fallback), border,
+-- and the colour of every piece of text. Rows pick the colours up in ApplyRow.
+function Host:ApplySkin(name)
+    local skin = Chui.Theme.skins[name] or Chui.Theme.skins.dark
+    self.skin = skin
+    local art = skin.art and Chui.Media.skins and Chui.Media.skins[skin.art]
+    self.art = (art and art.file) and art or nil
+
+    self.bg:SetColorTexture(unpack(skin.surface))
+    self.bg:SetShown(self.art == nil)
+    self.paper:SetShown(self.art ~= nil)
+    self.paper:SetVertexColor(unpack(skin.paperTint or { 1, 1, 1 }))
+    for _, piece in ipairs(self.plate) do piece:SetShown(self.art ~= nil) end
+
+    -- The border always shows: it is the frame the paper is cut off at.
+    local thickness = skin.edgeWidth or T.space.edge
+    local top, bottom, left, right = unpack(self.edges)
+    for _, edge in ipairs(self.edges) do edge:SetColorTexture(unpack(skin.edge)) end
+    PixelUtil.SetHeight(top, thickness, thickness)
+    PixelUtil.SetHeight(bottom, thickness, thickness)
+    PixelUtil.SetWidth(left, thickness, thickness)
+    PixelUtil.SetWidth(right, thickness, thickness)
+
+    self.title:SetTextColor(unpack(skin.text.primary))
+    self.subtitle:SetTextColor(unpack(skin.text.secondary))
+    self.body:SetTextColor(unpack(skin.text.primary))
+    self.thumb:SetColorTexture(unpack(skin.thumb))
+end
+
+-- The name plate behind the title: the art's bar cut into two end caps and a
+-- middle that stretches, `height` tall, across the panel's inner width.
+function Host:LayoutPlate(inner, height)
+    local art, f = self.art, self.frame
+    local r = art.titlePlate
+    local capW = T.space.plateCap
+    local left, mid, right = unpack(self.plate)
+    SetRegion(left, art, { r[1], r[1] + r.cap, r[3], r[4] })
+    SetRegion(mid, art, { r[1] + r.cap, r[2] - r.cap, r[3], r[4] })
+    SetRegion(right, art, { r[2] - r.cap, r[2], r[3], r[4] })
+    left:ClearAllPoints()
+    left:SetSize(capW, height)
+    left:SetPoint("TOPLEFT", f, "TOPLEFT", T.space.pad, -T.space.pad)
+    right:ClearAllPoints()
+    right:SetSize(capW, height)
+    right:SetPoint("TOPRIGHT", f, "TOPRIGHT", -T.space.pad, -T.space.pad)
+    mid:ClearAllPoints()
+    mid:SetPoint("TOPLEFT", left, "TOPRIGHT", 0, 0)
+    mid:SetPoint("BOTTOMRIGHT", right, "BOTTOMLEFT", 0, 0)
+end
+
+-- Size and place the art for a panel of this size. The paper is cropped out
+-- of the sheet's solid middle (art.paper) to the panel's proportions, so it
+-- fills the panel edge to edge with no torn edges or shadow to mask.
+function Host:LayoutArt(width, height)
+    local art, f = self.art, self.frame
+    if not art then return end
+
+    local p = art.paper
+    local paperW, paperH = p[2] - p[1], p[4] - p[3]
+    local cropW, cropH = paperW, paperH
+    if width / height > paperW / paperH then
+        cropH = paperW * height / width -- wide panel: use all the width, less of the height
+    else
+        cropW = paperH * width / height -- tall panel: use all the height, less of the width
+    end
+    local cx, cy = (p[1] + p[2]) / 2, (p[3] + p[4]) / 2
+    SetRegion(self.paper, art, { cx - cropW / 2, cx + cropW / 2, cy - cropH / 2, cy + cropH / 2 })
+end
+
 -- Fill a row's icon, price column, stack count and text layout, and return
 -- how tall the row needs to be. Single-line rows cut long text off at the edge
 -- and are T.space.row tall. Rows with `wrap` set (gossip, quests, trainer
@@ -247,6 +370,16 @@ local ROW_TEXT_PAD = 8 -- space above and below wrapped text
 
 local function ApplyRow(row, r, inner)
     local icon, text = row.icon, row.text
+    local ink = Host.skin.text.primary
+    text:SetTextColor(unpack(ink))
+    row.right:SetTextColor(unpack(ink))
+    row.count:SetTextColor(unpack(ink))
+    row.highlight:SetColorTexture(unpack(Host.skin.highlight))
+    row:EnableMouse(not r.inert) -- headings aren't buttons
+    row.selection:SetShown(r.selected == true)
+    if r.selected then row.selection:SetColorTexture(unpack(Host.skin.selected)) end
+    row.check:SetShown(r.selected == true)
+    local rightInset = r.selectable and 32 or 8 -- room for the check mark
     local iconSize = r.iconSize or T.space.icon
     local shown = true
     if r.atlas and C_Texture.GetAtlasInfo(r.atlas) then
@@ -271,8 +404,8 @@ local function ApplyRow(row, r, inner)
         row.right:SetText("")
         text:SetWordWrap(true)
         text:SetPoint("LEFT", leftInset, 0)
-        text:SetWidth(inner - leftInset - 8)
-        return math.max(T.space.row, math.ceil(text:GetStringHeight() + 2 * ROW_TEXT_PAD))
+        text:SetWidth(inner - leftInset - rightInset)
+        return math.max(r.height or T.space.row, math.ceil(text:GetStringHeight() + 2 * ROW_TEXT_PAD))
     end
 
     local hasRight = r.right and r.right ~= ""
@@ -283,9 +416,9 @@ local function ApplyRow(row, r, inner)
     if hasRight then
         text:SetPoint("RIGHT", row.right, "LEFT", -8, 0)
     else
-        text:SetPoint("RIGHT", -8, 0)
+        text:SetPoint("RIGHT", -rightInset, 0)
     end
-    return T.space.row
+    return r.height or T.space.row
 end
 
 -- Lay out content, size to fit, place, show. Synchronous: the panel is
@@ -293,10 +426,15 @@ end
 -- content = { title, subtitle, body, width,
 --             rows = { { text, onClick, atlas, icon, muted,
 --                        right, count, tint, iconSize, tooltip, onSplit, clicks,
---                        wrap }, ... } (optional),
+--                        wrap, inert, height, selectable, selected, number }, ... } (optional),
+--               inert rows are headings (no hover or click); selectable rows keep room
+--               for a check mark, drawn on the selected one; number = a digit key that
+--               presses the row; height raises a row's minimum height,
 --               row.onClick(button, row) runs on the clicks named in row.clicks
 --               (default "LeftButtonUp"); row.tooltip(row) shows a tooltip on hover.
 --             tabs = { { text, active, onClick }, ... } (optional) buttons under the subtitle,
+--             skin = "dark" (default) or "parchment"; the view also calls
+--               Theme.Use(skin) before building its text,
 --             fixedHeight = true makes the panel its maximum height whatever the
 --               content, so it doesn't change size between views,
 --             keepScroll = true keeps the scroll position when the same owner
@@ -304,6 +442,7 @@ end
 --             primary = { text, onClick, enabled } (optional) }
 function Host:Present(owner, content)
     local f, child, scroll, cfg = self.frame, self.child, self.scroll, Chui.cfg
+    self:ApplySkin(content.skin or "dark")
     local keepScroll = content.keepScroll and f:IsShown() and self.owner == owner
     local previousScroll = keepScroll and scroll:GetVerticalScroll() or 0
     local pad = T.space.pad
@@ -312,18 +451,30 @@ function Host:Present(owner, content)
     local unit = PixelUtil.GetPixelToUIUnitFactor() / f:GetEffectiveScale()
     local function snap(v) return Layout.Snap(v, unit) end
 
-    -- Header
+    -- Header. With art the NPC name is centred on a plate that is as tall as
+    -- the (possibly wrapped) name needs; otherwise it is plain left-aligned text.
     local y = pad
     local title = self.title
-    title:SetWidth(inner - CLOSE_BUTTON_ROOM)
     title:SetText(content.title or "")
     title:ClearAllPoints()
-    title:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -y)
-    y = y + title:GetStringHeight()
+    if self.art then
+        title:SetJustifyH("CENTER")
+        title:SetWidth(inner - 2 * T.space.plateCap)
+        local plateH = math.max(T.space.plate, math.ceil(title:GetStringHeight() + 2 * T.space.plateMargin))
+        title:SetPoint("CENTER", f, "TOPLEFT", pad + inner / 2, -(pad + plateH / 2))
+        self:LayoutPlate(inner, plateH)
+        y = y + plateH
+    else
+        title:SetJustifyH("LEFT")
+        title:SetWidth(inner - CLOSE_BUTTON_ROOM)
+        title:SetPoint("TOPLEFT", f, "TOPLEFT", pad, -y)
+        y = y + title:GetStringHeight()
+    end
 
     local subtitle = self.subtitle
     if content.subtitle and content.subtitle ~= "" then
         y = y + T.space.tight
+        subtitle:SetJustifyH(self.art and "CENTER" or "LEFT")
         subtitle:SetWidth(inner)
         subtitle:SetText(content.subtitle)
         subtitle:ClearAllPoints()
@@ -366,8 +517,10 @@ function Host:Present(owner, content)
     local rows, used = content.rows, 0
     if rows and #rows > 0 then
         if cy > 0 then cy = cy + T.space.section end
+        wipe(self.numberRows)
         for i, r in ipairs(rows) do
             local row = self:AcquireRow(i)
+            if r.number then self.numberRows[r.number] = row end
             row.text:SetText(r.text)
             local rowH = ApplyRow(row, r, inner)
             row.action = r.onClick
@@ -421,6 +574,7 @@ function Host:Present(owner, content)
     self.spaceHeld = IsKeyDown("SPACE") -- a press already down belongs to the previous view
     self:UpdateThumb(scroll:GetVerticalScroll())
     self:Place(width, fit.height)
+    self:LayoutArt(width, fit.height)
     f:Show()
 end
 

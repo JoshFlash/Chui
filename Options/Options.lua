@@ -41,6 +41,19 @@ local function Build()
                 name = "Appearance",
                 order = 1,
                 args = {
+                    parchment = {
+                        type = "toggle",
+                        name = "Parchment background",
+                        desc = "Draw gossip and quest panels on paper with dark text. Off gives them the dark panel the vendor uses.",
+                        order = 0,
+                        width = "full",
+                        get = function() return Chui.db.parchment end,
+                        set = function(_, value)
+                            Chui.db.parchment = value
+                            Chui.Config:Rebuild()
+                            Chui.Host:Refresh()
+                        end,
+                    },
                     font = {
                         type = "select",
                         name = "Font",
